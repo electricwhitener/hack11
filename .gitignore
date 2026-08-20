@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+build/
+dist/
+.env
+.env.local
+.env*.local
+web/src/generated/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+*.log
+.vercel

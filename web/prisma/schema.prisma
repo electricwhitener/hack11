@@ -1,0 +1,19 @@
+// Prisma 7. The connection URL lives in prisma.config.ts, NOT here.
+// After editing:  npx prisma db push
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Placeholder so the schema is valid before the problem statement lands.
+/// Replace with your real domain models.
+model Record {
+  id        String   @id @default(cuid())
+  kind      String
+  payload   Json
+  createdAt DateTime @default(now())
+}
