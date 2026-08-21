@@ -2,110 +2,74 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Lamp } from 'lucide-react';
 import { NAV, APP_NAME } from './nav';
-import { NotificationBell } from './NotificationBell';
-import { ThemeToggle } from './ThemeToggle';
 import { UserMenu } from './UserMenu';
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
-  const pathname = usePathname();
-
-  return (
-    <nav className="flex flex-col gap-1 p-3">
-      {NAV.map(({ href, label, icon: Icon }) => {
-        const active = pathname === href;
-        return (
-          <Link
-            key={href}
-            href={href}
-            onClick={onNavigate}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-              active
-                ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
-                : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-            }`}
-          >
-            <Icon className="size-4 shrink-0" />
-            {label}
-          </Link>
-        );
-      })}
-    </nav>
-  );
-}
-
 /**
- * Page frame: fixed sidebar on desktop, slide-out on mobile.
- * Wrap page content in this. The `title` shows in the header bar.
+ * Page frame: one slim header, everything else is content.
  *
- * `sidebarExtra` fills the space under the nav links — the agent page passes
- * its conversation list there so past chats are always visible rather than
- * buried behind an icon.
+ * There is no persistent sidebar. With only two destinations it was spending
+ * 256px to show two links, and on the map — which is the product — that space
+ * matters more than the navigation does. Settings, theme and notifications all
+ * moved into the account menu, where people look for them anyway.
+ *
+ * `bleed` gives a page the full viewport under the header with no scrolling,
+ * which is what the map needs; ordinary pages scroll normally.
  */
 export function AppShell({
   title,
   children,
-  sidebarExtra,
+  bleed = false,
 }: {
   title?: string;
   children: React.ReactNode;
-  sidebarExtra?: React.ReactNode;
+  bleed?: boolean;
 }) {
-  const sidebarBody = (onNavigate?: () => void) => (
-    <>
-      <NavLinks onNavigate={onNavigate} />
-      {sidebarExtra ? (
-        <>
-          <div className="mx-3 border-t" />
-          <div className="flex min-h-0 flex-1 flex-col pt-3">{sidebarExtra}</div>
-        </>
-      ) : null}
-    </>
-  );
+  const pathname = usePathname();
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 flex-col border-r bg-sidebar md:flex">
-        <div className="flex h-14 shrink-0 items-center border-b px-5 font-semibold tracking-tight">
-          {APP_NAME}
+    <div className="flex h-dvh flex-col overflow-hidden bg-background">
+      <header className="z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-card px-3 md:px-4">
+        <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
+          <Lamp className="size-5 text-primary" />
+          <span className="hidden sm:inline">{APP_NAME}</span>
+        </Link>
+
+        <nav className="ml-2 flex items-center gap-1 md:ml-6">
+          {NAV.map(({ href, label, icon: Icon }) => {
+            const active = pathname === href;
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors md:px-3 ${
+                  active
+                    ? 'bg-secondary font-medium text-secondary-foreground'
+                    : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+                }`}
+              >
+                <Icon className="size-4 shrink-0" />
+                <span className="hidden sm:inline">{label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        {title ? (
+          <span className="ml-auto hidden truncate text-xs text-muted-foreground lg:block">
+            {title}
+          </span>
+        ) : null}
+
+        <div className="ml-auto flex items-center gap-1 lg:ml-4">
+          <UserMenu />
         </div>
-        {sidebarBody()}
-      </aside>
+      </header>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-3 md:px-5">
-          {/* Mobile menu */}
-          <Sheet>
-            <SheetTrigger
-              render={
-                <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open menu" />
-              }
-            >
-              <Menu className="size-4" />
-            </SheetTrigger>
-            <SheetContent side="left" className="flex w-64 flex-col p-0">
-              <SheetTitle className="flex h-14 shrink-0 items-center border-b px-5 text-base font-semibold">
-                {APP_NAME}
-              </SheetTitle>
-              {sidebarBody()}
-            </SheetContent>
-          </Sheet>
-
-          <h1 className="truncate text-sm font-medium">{title}</h1>
-
-          <div className="ml-auto flex items-center gap-1">
-            <NotificationBell />
-            <ThemeToggle />
-            <UserMenu />
-          </div>
-        </header>
-
-        <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
-      </div>
+      <main className={bleed ? 'relative min-h-0 flex-1' : 'min-h-0 flex-1 overflow-y-auto'}>
+        {children}
+      </main>
     </div>
   );
 }

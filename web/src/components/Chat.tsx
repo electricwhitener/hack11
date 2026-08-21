@@ -17,8 +17,9 @@ import { useNotifications } from '@/components/providers/notifications';
  * the problem statement turns out to be.
  */
 const SUGGESTIONS = [
-  'Chart these sales: Jan 120, Feb 150, Mar 175, Apr 210',
-  'What can you do?',
+  'Walking from B3 Block to zanak at 11pm — is there a safer way?',
+  'Which paths on campus should be lit first?',
+  'How bad is this campus after dark?',
 ];
 
 export function Chat() {
@@ -39,10 +40,11 @@ export function Chat() {
       <div className="flex-1 space-y-5 overflow-y-auto p-4">
         {messages.length === 0 && (
           <div className="mx-auto mt-20 max-w-md text-center">
-            <h2 className="text-lg font-medium">What can I help you with?</h2>
+            <h2 className="text-lg font-medium">Where are you walking tonight?</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              I can chart data, run analyses on your datasets, and ask your approval
-              before taking any real action.
+              I can compare your route against a better-lit one, explain which streets
+              carry the most night foot traffic, and rank what the corporation should
+              repair first — using computed figures, never guesses.
             </p>
 
             <div className="mt-6 grid gap-2 text-left">

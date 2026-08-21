@@ -1,17 +1,15 @@
-import { Bot, LayoutDashboard, Database, Settings, type LucideIcon } from 'lucide-react';
+import { Map, ListOrdered, type LucideIcon } from 'lucide-react';
 
 export type NavItem = { href: string; label: string; icon: LucideIcon };
 
 /**
- * Edit this one array to change the sidebar. Add a route file at the matching
- * path under src/app/ and it appears automatically.
+ * Two places, because there are only two things to do: look at the map, or work
+ * the repair list. The agent is not a destination — it lives on the map, where
+ * the questions actually come up.
  */
 export const NAV: NavItem[] = [
-  { href: '/', label: 'Agent', icon: Bot },
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/data', label: 'Data', icon: Database },
-  { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/', label: 'Dark-zone map', icon: Map },
+  { href: '/queue', label: 'Repair queue', icon: ListOrdered },
 ];
 
-/** Shown in the sidebar header and the browser tab. Rename at kickoff. */
-export const APP_NAME = 'Untitled';
+export const APP_NAME = 'Nightline';

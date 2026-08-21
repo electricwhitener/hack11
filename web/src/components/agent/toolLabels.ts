@@ -7,8 +7,11 @@
  */
 export const TOOL_LABELS: Record<string, { running: string; done: string }> = {
   showChart: { running: 'Drawing chart', done: 'Chart ready' },
-  runAnalysis: { running: 'Analysing dataset', done: 'Analysis complete' },
-  commitAction: { running: 'Preparing action', done: 'Action ready' },
+  getAreaStats: { running: 'Reading area statistics', done: 'Area statistics' },
+  planSafeRoute: { running: 'Routing both ways', done: 'Routes compared' },
+  rankRepairQueue: { running: 'Ranking repairs by risk removed', done: 'Repair queue ranked' },
+  explainRanking: { running: 'Checking the underlying scores', done: 'Scores retrieved' },
+  fileRepairRequest: { running: 'Drafting repair request', done: 'Request ready to file' },
 };
 
 export function toolLabel(name: string, phase: 'running' | 'done' = 'running') {

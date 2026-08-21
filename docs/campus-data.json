@@ -1,0 +1,46 @@
+{
+  "_readme": [
+    "Ground truth that OpenStreetMap does not have. Edit this file by hand, then re-run:",
+    "    cd py-service && python precompute.py",
+    "    cd web && npx tsx scripts/facts.ts",
+    "",
+    "Every entry is located by a lat/lng point. The pipeline snaps it to the nearest",
+    "street segment and applies the change to that WHOLE path, not just the segment,",
+    "because a locked gate or a dead lamp affects the whole stretch.",
+    "",
+    "To get coordinates: open /map, turn on 'Inspect a path', and click. The toast",
+    "gives you a line you can paste straight into this file.",
+    "",
+    "blocked   - paths that cannot actually be walked (locked gate, wall, staff-only,",
+    "            construction). Removed from the graph entirely BEFORE the exposure",
+    "            model runs, so foot traffic reroutes the way people really do.",
+    "lighting  - surveyed lit/unlit ground truth. Overrides both OSM and the seed.",
+    "landmarks - places OSM is missing. kind is 'hostel' (people start here) or",
+    "            'dest' (people walk to here).",
+    "emergency - security posts, medical centre, wardens. Shown on the map and used",
+    "            to tell a walker what is near their route."
+  ],
+
+  "blocked": [
+    {
+      "lat": 0,
+      "lng": 0,
+      "note": "EXAMPLE - delete this. Describe why it cannot be walked.",
+      "enabled": false
+    }
+  ],
+
+  "lighting": [
+    {
+      "lat": 0,
+      "lng": 0,
+      "lit": false,
+      "note": "EXAMPLE - delete this. Surveyed on foot, date.",
+      "enabled": false
+    }
+  ],
+
+  "landmarks": [],
+
+  "emergency": []
+}

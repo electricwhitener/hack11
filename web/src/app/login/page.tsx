@@ -84,11 +84,26 @@ export default function LoginPage() {
         });
 
         if (signUpError) {
-          // Wrong password on an existing account reports as "already
-          // registered", which is confusing. Say what actually happened.
+          /*
+           * "Already registered" here has TWO causes and they need different
+           * advice:
+           *
+           *  1. The account was created with Google. Supabase stores NO password
+           *     for an OAuth signup, so there is nothing for the entered
+           *     password to match — a Google account's password belongs to
+           *     Google, not to us. This looks exactly like a wrong password and
+           *     is the reported bug.
+           *  2. The account really does have a password and it was mistyped.
+           *
+           * Supabase deliberately will not tell the client which, because that
+           * would let anyone enumerate accounts. So name both, and lead with
+           * the one that actually strands people.
+           */
           setError(
-            /already registered/i.test(signUpError.message)
-              ? 'That email already has an account, but the password is wrong.'
+            /already registered|already exists/i.test(signUpError.message)
+              ? 'That email is already registered. If you first signed in with Google, use ' +
+                '“Continue with Google” above — a Google account has no separate password here. ' +
+                'Otherwise, check the password and try again.'
               : signUpError.message,
           );
           setBusy(false);

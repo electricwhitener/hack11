@@ -1,0 +1,3511 @@
+{
+  "generated": "2026-08-21T20:55:58.229Z",
+  "area": "Manipal University Jaipur, Dehmi Kalan",
+  "bbox": "26.835,75.554,26.851,75.572",
+  "stats": {
+    "area": "Manipal University Jaipur, Dehmi Kalan",
+    "totalKm": 49.7,
+    "darkKm": 14.2,
+    "darkPct": 29,
+    "segments": 1883,
+    "highRiskSegments": 56,
+    "highRiskKm": 1.1,
+    "hostels": 10,
+    "destinations": 22,
+    "modelledTrips": 1430,
+    "litFromOsm": 68,
+    "litSimulated": 1815,
+    "totalRiskMeters": 534
+  },
+  "model": {
+    "hostels": 10,
+    "destinations": 22,
+    "modelledTrips": 1430,
+    "darkByClass": {
+      "primary": 0.05,
+      "secondary": 0.1,
+      "tertiary": 0.2,
+      "residential": 0.3,
+      "living_street": 0.4,
+      "unclassified": 0.45,
+      "service": 0.5,
+      "pedestrian": 0.4,
+      "footway": 0.65,
+      "path": 0.75,
+      "steps": 0.6,
+      "track": 0.8
+    }
+  },
+  "queue": [
+    {
+      "id": "Footpath by TMA Pai Auditorium",
+      "label": "Footpath by TMA Pai Auditorium",
+      "meters": 1103,
+      "riskMeters": 42,
+      "benefitPct": 7.9,
+      "avgExposure": 0.038,
+      "segments": 45
+    },
+    {
+      "id": "Footpath by Subway entrance/exit",
+      "label": "Footpath by Subway entrance/exit",
+      "meters": 238,
+      "riskMeters": 38,
+      "benefitPct": 7.1,
+      "avgExposure": 0.158,
+      "segments": 8
+    },
+    {
+      "id": "Footpath by Central Library",
+      "label": "Footpath by Central Library",
+      "meters": 323,
+      "riskMeters": 36,
+      "benefitPct": 6.7,
+      "avgExposure": 0.11,
+      "segments": 16
+    },
+    {
+      "id": "Footpath by Old Mess",
+      "label": "Footpath by Old Mess",
+      "meters": 258,
+      "riskMeters": 33,
+      "benefitPct": 6.2,
+      "avgExposure": 0.129,
+      "segments": 14
+    },
+    {
+      "id": "Footpath by B7 Boy's Block",
+      "label": "Footpath by B7 Boy's Block",
+      "meters": 542,
+      "riskMeters": 24,
+      "benefitPct": 4.5,
+      "avgExposure": 0.044,
+      "segments": 29
+    },
+    {
+      "id": "Footpath by Officie Directorate of Academics",
+      "label": "Footpath by Officie Directorate of Academics",
+      "meters": 316,
+      "riskMeters": 22,
+      "benefitPct": 4.2,
+      "avgExposure": 0.071,
+      "segments": 30
+    },
+    {
+      "id": "Footpath by University Entrance",
+      "label": "Footpath by University Entrance",
+      "meters": 199,
+      "riskMeters": 21,
+      "benefitPct": 4,
+      "avgExposure": 0.107,
+      "segments": 7
+    },
+    {
+      "id": "Footpath by Subway",
+      "label": "Footpath by Subway",
+      "meters": 83,
+      "riskMeters": 20,
+      "benefitPct": 3.7,
+      "avgExposure": 0.241,
+      "segments": 2
+    }
+  ],
+  "queueTop5Pct": 32.4,
+  "trips": [
+    {
+      "from": "B1 Block",
+      "to": "Faculty Block Entrance",
+      "meters": 230,
+      "darkBefore": 73,
+      "darkAfter": 0,
+      "extraMeters": 147,
+      "extraPct": 64,
+      "cutPct": 100,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Service road by Subway Entrance",
+        "meters": 28
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "Quess Mess & Gym complex",
+      "meters": 172,
+      "darkBefore": 46,
+      "darkAfter": 0,
+      "extraMeters": 45,
+      "extraPct": 26,
+      "cutPct": 100,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "Faculty Block Entrance",
+      "meters": 391,
+      "darkBefore": 119,
+      "darkAfter": 0,
+      "extraMeters": 4,
+      "extraPct": 1,
+      "cutPct": 100,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "Faculty Block Entrance",
+      "meters": 434,
+      "darkBefore": 119,
+      "darkAfter": 0,
+      "extraMeters": 3,
+      "extraPct": 1,
+      "cutPct": 100,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "zanak",
+      "meters": 739,
+      "darkBefore": 382,
+      "darkAfter": 4,
+      "extraMeters": 1,
+      "extraPct": 0,
+      "cutPct": 99,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by NBC",
+        "meters": 159
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "zanak",
+      "meters": 827,
+      "darkBefore": 462,
+      "darkAfter": 4,
+      "extraMeters": 37,
+      "extraPct": 4,
+      "cutPct": 99,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by NBC",
+        "meters": 159
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "zanak",
+      "meters": 813,
+      "darkBefore": 462,
+      "darkAfter": 4,
+      "extraMeters": 44,
+      "extraPct": 5,
+      "cutPct": 99,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by NBC",
+        "meters": 159
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "BABA",
+      "meters": 475,
+      "darkBefore": 114,
+      "darkAfter": 4,
+      "extraMeters": 6,
+      "extraPct": 1,
+      "cutPct": 96,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "NBC",
+      "meters": 524,
+      "darkBefore": 114,
+      "darkAfter": 4,
+      "extraMeters": 6,
+      "extraPct": 1,
+      "cutPct": 96,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "BABA",
+      "meters": 460,
+      "darkBefore": 114,
+      "darkAfter": 4,
+      "extraMeters": 14,
+      "extraPct": 3,
+      "cutPct": 96,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "NBC",
+      "meters": 510,
+      "darkBefore": 114,
+      "darkAfter": 4,
+      "extraMeters": 13,
+      "extraPct": 3,
+      "cutPct": 96,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "BABA",
+      "meters": 504,
+      "darkBefore": 114,
+      "darkAfter": 4,
+      "extraMeters": 12,
+      "extraPct": 2,
+      "cutPct": 96,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "NBC",
+      "meters": 553,
+      "darkBefore": 114,
+      "darkAfter": 4,
+      "extraMeters": 12,
+      "extraPct": 2,
+      "cutPct": 96,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "zanak",
+      "meters": 734,
+      "darkBefore": 515,
+      "darkAfter": 24,
+      "extraMeters": 57,
+      "extraPct": 8,
+      "cutPct": 95,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by NBC",
+        "meters": 159
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "zanak",
+      "meters": 576,
+      "darkBefore": 357,
+      "darkAfter": 21,
+      "extraMeters": 41,
+      "extraPct": 7,
+      "cutPct": 94,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by NBC",
+        "meters": 159
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "Faculty Block Entrance",
+      "meters": 312,
+      "darkBefore": 172,
+      "darkAfter": 19,
+      "extraMeters": 17,
+      "extraPct": 5,
+      "cutPct": 89,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B2 block",
+        "meters": 56
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "BABA",
+      "meters": 381,
+      "darkBefore": 168,
+      "darkAfter": 24,
+      "extraMeters": 27,
+      "extraPct": 7,
+      "cutPct": 86,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B2 block",
+        "meters": 56
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "NBC",
+      "meters": 431,
+      "darkBefore": 168,
+      "darkAfter": 24,
+      "extraMeters": 26,
+      "extraPct": 6,
+      "cutPct": 86,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B2 block",
+        "meters": 56
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "University Entrance",
+      "meters": 303,
+      "darkBefore": 129,
+      "darkAfter": 19,
+      "extraMeters": 6,
+      "extraPct": 2,
+      "cutPct": 85,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "University Entrance",
+      "meters": 288,
+      "darkBefore": 129,
+      "darkAfter": 19,
+      "extraMeters": 14,
+      "extraPct": 5,
+      "cutPct": 85,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "University Entrance",
+      "meters": 332,
+      "darkBefore": 129,
+      "darkAfter": 19,
+      "extraMeters": 12,
+      "extraPct": 4,
+      "cutPct": 85,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "zanak",
+      "meters": 948,
+      "darkBefore": 447,
+      "darkAfter": 69,
+      "extraMeters": 1,
+      "extraPct": 0,
+      "cutPct": 85,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by NBC",
+        "meters": 159
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "zanak",
+      "meters": 855,
+      "darkBefore": 447,
+      "darkAfter": 69,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 85,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by NBC",
+        "meters": 159
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "Bluedove Mess",
+      "meters": 253,
+      "darkBefore": 74,
+      "darkAfter": 12,
+      "extraMeters": 47,
+      "extraPct": 19,
+      "cutPct": 84,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "zanak",
+      "meters": 652,
+      "darkBefore": 416,
+      "darkAfter": 68,
+      "extraMeters": 31,
+      "extraPct": 5,
+      "cutPct": 84,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by NBC",
+        "meters": 159
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "University Entrance",
+      "meters": 209,
+      "darkBefore": 183,
+      "darkAfter": 39,
+      "extraMeters": 27,
+      "extraPct": 13,
+      "cutPct": 79,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B2 block",
+        "meters": 56
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "zanak",
+      "meters": 935,
+      "darkBefore": 496,
+      "darkAfter": 120,
+      "extraMeters": 2,
+      "extraPct": 0,
+      "cutPct": 76,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by NBC",
+        "meters": 159
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "Subway Entrance",
+      "meters": 128,
+      "darkBefore": 124,
+      "darkAfter": 44,
+      "extraMeters": 4,
+      "extraPct": 3,
+      "cutPct": 65,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B2 block",
+        "meters": 56
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "Subway Entrance",
+      "meters": 137,
+      "darkBefore": 71,
+      "darkAfter": 25,
+      "extraMeters": 44,
+      "extraPct": 32,
+      "cutPct": 65,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "Subway Entrance",
+      "meters": 221,
+      "darkBefore": 71,
+      "darkAfter": 25,
+      "extraMeters": 30,
+      "extraPct": 14,
+      "cutPct": 65,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "Subway Entrance",
+      "meters": 207,
+      "darkBefore": 71,
+      "darkAfter": 25,
+      "extraMeters": 30,
+      "extraPct": 14,
+      "cutPct": 65,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "Subway Entrance",
+      "meters": 250,
+      "darkBefore": 71,
+      "darkAfter": 25,
+      "extraMeters": 30,
+      "extraPct": 12,
+      "cutPct": 65,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "Subway",
+      "meters": 144,
+      "darkBefore": 128,
+      "darkAfter": 47,
+      "extraMeters": 5,
+      "extraPct": 3,
+      "cutPct": 63,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B2 block",
+        "meters": 56
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "Subway",
+      "meters": 153,
+      "darkBefore": 74,
+      "darkAfter": 28,
+      "extraMeters": 45,
+      "extraPct": 29,
+      "cutPct": 62,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "Subway",
+      "meters": 238,
+      "darkBefore": 74,
+      "darkAfter": 28,
+      "extraMeters": 30,
+      "extraPct": 13,
+      "cutPct": 62,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "Subway",
+      "meters": 223,
+      "darkBefore": 74,
+      "darkAfter": 28,
+      "extraMeters": 30,
+      "extraPct": 13,
+      "cutPct": 62,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "Subway",
+      "meters": 267,
+      "darkBefore": 74,
+      "darkAfter": 28,
+      "extraMeters": 30,
+      "extraPct": 11,
+      "cutPct": 62,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "Bluedove Mess",
+      "meters": 163,
+      "darkBefore": 27,
+      "darkAfter": 12,
+      "extraMeters": 2,
+      "extraPct": 1,
+      "cutPct": 56,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Service road by Bluedove Mess",
+        "meters": 27
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "Administrative Block",
+      "meters": 435,
+      "darkBefore": 269,
+      "darkAfter": 125,
+      "extraMeters": 27,
+      "extraPct": 6,
+      "cutPct": 54,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "Central Library",
+      "meters": 364,
+      "darkBefore": 269,
+      "darkAfter": 125,
+      "extraMeters": 26,
+      "extraPct": 7,
+      "cutPct": 54,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "AB1",
+      "meters": 339,
+      "darkBefore": 245,
+      "darkAfter": 115,
+      "extraMeters": 78,
+      "extraPct": 23,
+      "cutPct": 53,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B2 block",
+        "meters": 56
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "Faculty Block 4",
+      "meters": 339,
+      "darkBefore": 245,
+      "darkAfter": 115,
+      "extraMeters": 78,
+      "extraPct": 23,
+      "cutPct": 53,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B2 block",
+        "meters": 56
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "Library CCE",
+      "meters": 393,
+      "darkBefore": 250,
+      "darkAfter": 120,
+      "extraMeters": 78,
+      "extraPct": 20,
+      "cutPct": 52,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B2 block",
+        "meters": 56
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "Officie Directorate of Academics",
+      "meters": 383,
+      "darkBefore": 255,
+      "darkAfter": 125,
+      "extraMeters": 78,
+      "extraPct": 20,
+      "cutPct": 51,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B2 block",
+        "meters": 56
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "Administrative Block",
+      "meters": 529,
+      "darkBefore": 216,
+      "darkAfter": 106,
+      "extraMeters": 6,
+      "extraPct": 1,
+      "cutPct": 51,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "Central Library",
+      "meters": 457,
+      "darkBefore": 216,
+      "darkAfter": 106,
+      "extraMeters": 6,
+      "extraPct": 1,
+      "cutPct": 51,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "Administrative Block",
+      "meters": 514,
+      "darkBefore": 216,
+      "darkAfter": 106,
+      "extraMeters": 14,
+      "extraPct": 3,
+      "cutPct": 51,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "Central Library",
+      "meters": 443,
+      "darkBefore": 216,
+      "darkAfter": 106,
+      "extraMeters": 13,
+      "extraPct": 3,
+      "cutPct": 51,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "Administrative Block",
+      "meters": 558,
+      "darkBefore": 216,
+      "darkAfter": 106,
+      "extraMeters": 12,
+      "extraPct": 2,
+      "cutPct": 51,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "Central Library",
+      "meters": 486,
+      "darkBefore": 216,
+      "darkAfter": 106,
+      "extraMeters": 12,
+      "extraPct": 2,
+      "cutPct": 51,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "AB1",
+      "meters": 348,
+      "darkBefore": 192,
+      "darkAfter": 96,
+      "extraMeters": 18,
+      "extraPct": 5,
+      "cutPct": 50,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "Faculty Block 4",
+      "meters": 348,
+      "darkBefore": 192,
+      "darkAfter": 96,
+      "extraMeters": 18,
+      "extraPct": 5,
+      "cutPct": 50,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "AB1",
+      "meters": 433,
+      "darkBefore": 192,
+      "darkAfter": 96,
+      "extraMeters": 57,
+      "extraPct": 13,
+      "cutPct": 50,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "Faculty Block 4",
+      "meters": 433,
+      "darkBefore": 192,
+      "darkAfter": 96,
+      "extraMeters": 57,
+      "extraPct": 13,
+      "cutPct": 50,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "AB1",
+      "meters": 418,
+      "darkBefore": 192,
+      "darkAfter": 96,
+      "extraMeters": 65,
+      "extraPct": 16,
+      "cutPct": 50,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "Faculty Block 4",
+      "meters": 418,
+      "darkBefore": 192,
+      "darkAfter": 96,
+      "extraMeters": 65,
+      "extraPct": 16,
+      "cutPct": 50,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "AB1",
+      "meters": 462,
+      "darkBefore": 192,
+      "darkAfter": 96,
+      "extraMeters": 63,
+      "extraPct": 14,
+      "cutPct": 50,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "Faculty Block 4",
+      "meters": 462,
+      "darkBefore": 192,
+      "darkAfter": 96,
+      "extraMeters": 63,
+      "extraPct": 14,
+      "cutPct": 50,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "Library CCE",
+      "meters": 402,
+      "darkBefore": 197,
+      "darkAfter": 101,
+      "extraMeters": 18,
+      "extraPct": 4,
+      "cutPct": 49,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "Library CCE",
+      "meters": 487,
+      "darkBefore": 197,
+      "darkAfter": 101,
+      "extraMeters": 57,
+      "extraPct": 12,
+      "cutPct": 49,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "Library CCE",
+      "meters": 472,
+      "darkBefore": 197,
+      "darkAfter": 101,
+      "extraMeters": 65,
+      "extraPct": 14,
+      "cutPct": 49,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "Library CCE",
+      "meters": 516,
+      "darkBefore": 197,
+      "darkAfter": 101,
+      "extraMeters": 63,
+      "extraPct": 12,
+      "cutPct": 49,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "FB Entrance",
+      "meters": 392,
+      "darkBefore": 264,
+      "darkAfter": 138,
+      "extraMeters": 84,
+      "extraPct": 21,
+      "cutPct": 48,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B2 block",
+        "meters": 56
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "Officie Directorate of Academics",
+      "meters": 392,
+      "darkBefore": 202,
+      "darkAfter": 106,
+      "extraMeters": 17,
+      "extraPct": 4,
+      "cutPct": 48,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "Officie Directorate of Academics",
+      "meters": 476,
+      "darkBefore": 202,
+      "darkAfter": 106,
+      "extraMeters": 58,
+      "extraPct": 12,
+      "cutPct": 48,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "Officie Directorate of Academics",
+      "meters": 462,
+      "darkBefore": 202,
+      "darkAfter": 106,
+      "extraMeters": 65,
+      "extraPct": 14,
+      "cutPct": 48,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "Officie Directorate of Academics",
+      "meters": 505,
+      "darkBefore": 202,
+      "darkAfter": 106,
+      "extraMeters": 64,
+      "extraPct": 13,
+      "cutPct": 48,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "FB Entrance",
+      "meters": 401,
+      "darkBefore": 211,
+      "darkAfter": 119,
+      "extraMeters": 24,
+      "extraPct": 6,
+      "cutPct": 44,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "FB Entrance",
+      "meters": 485,
+      "darkBefore": 211,
+      "darkAfter": 119,
+      "extraMeters": 64,
+      "extraPct": 13,
+      "cutPct": 44,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "FB Entrance",
+      "meters": 471,
+      "darkBefore": 211,
+      "darkAfter": 119,
+      "extraMeters": 71,
+      "extraPct": 15,
+      "cutPct": 44,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "FB Entrance",
+      "meters": 514,
+      "darkBefore": 211,
+      "darkAfter": 119,
+      "extraMeters": 70,
+      "extraPct": 14,
+      "cutPct": 44,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "Subway entrance/exit",
+      "meters": 215,
+      "darkBefore": 187,
+      "darkAfter": 106,
+      "extraMeters": 5,
+      "extraPct": 2,
+      "cutPct": 43,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B2 block",
+        "meters": 56
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "TMA Pai Auditorium",
+      "meters": 618,
+      "darkBefore": 459,
+      "darkAfter": 277,
+      "extraMeters": 37,
+      "extraPct": 6,
+      "cutPct": 40,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "TMA Pai Auditorium",
+      "meters": 712,
+      "darkBefore": 406,
+      "darkAfter": 257,
+      "extraMeters": 16,
+      "extraPct": 2,
+      "cutPct": 37,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "TMA Pai Auditorium",
+      "meters": 697,
+      "darkBefore": 406,
+      "darkAfter": 257,
+      "extraMeters": 24,
+      "extraPct": 3,
+      "cutPct": 37,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "TMA Pai Auditorium",
+      "meters": 741,
+      "darkBefore": 406,
+      "darkAfter": 257,
+      "extraMeters": 22,
+      "extraPct": 3,
+      "cutPct": 37,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "Subway entrance/exit",
+      "meters": 309,
+      "darkBefore": 134,
+      "darkAfter": 87,
+      "extraMeters": 30,
+      "extraPct": 10,
+      "cutPct": 35,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "Subway entrance/exit",
+      "meters": 294,
+      "darkBefore": 134,
+      "darkAfter": 87,
+      "extraMeters": 30,
+      "extraPct": 10,
+      "cutPct": 35,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "Subway entrance/exit",
+      "meters": 338,
+      "darkBefore": 134,
+      "darkAfter": 87,
+      "extraMeters": 30,
+      "extraPct": 9,
+      "cutPct": 35,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "Bluedove Mess",
+      "meters": 250,
+      "darkBefore": 46,
+      "darkAfter": 31,
+      "extraMeters": 3,
+      "extraPct": 1,
+      "cutPct": 33,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Service road by Bluedove Mess",
+        "meters": 27
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "AB2",
+      "meters": 601,
+      "darkBefore": 471,
+      "darkAfter": 326,
+      "extraMeters": 37,
+      "extraPct": 6,
+      "cutPct": 31,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "Academic Block -3",
+      "meters": 495,
+      "darkBefore": 415,
+      "darkAfter": 293,
+      "extraMeters": 89,
+      "extraPct": 18,
+      "cutPct": 29,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 95
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "AB2",
+      "meters": 695,
+      "darkBefore": 418,
+      "darkAfter": 307,
+      "extraMeters": 16,
+      "extraPct": 2,
+      "cutPct": 27,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "AB2",
+      "meters": 680,
+      "darkBefore": 418,
+      "darkAfter": 307,
+      "extraMeters": 24,
+      "extraPct": 4,
+      "cutPct": 27,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "AB2",
+      "meters": 724,
+      "darkBefore": 418,
+      "darkAfter": 307,
+      "extraMeters": 22,
+      "extraPct": 3,
+      "cutPct": 27,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "Old Mess",
+      "meters": 467,
+      "darkBefore": 310,
+      "darkAfter": 234,
+      "extraMeters": 77,
+      "extraPct": 16,
+      "cutPct": 25,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Old Mess",
+        "meters": 64
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "Academic Block -3",
+      "meters": 504,
+      "darkBefore": 362,
+      "darkAfter": 274,
+      "extraMeters": 29,
+      "extraPct": 6,
+      "cutPct": 24,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 95
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "Academic Block -3",
+      "meters": 588,
+      "darkBefore": 362,
+      "darkAfter": 274,
+      "extraMeters": 69,
+      "extraPct": 12,
+      "cutPct": 24,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 95
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "Academic Block -3",
+      "meters": 574,
+      "darkBefore": 362,
+      "darkAfter": 274,
+      "extraMeters": 76,
+      "extraPct": 13,
+      "cutPct": 24,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 95
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "Academic Block -3",
+      "meters": 617,
+      "darkBefore": 362,
+      "darkAfter": 274,
+      "extraMeters": 75,
+      "extraPct": 12,
+      "cutPct": 24,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 95
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "Subway entrance/exit",
+      "meters": 224,
+      "darkBefore": 134,
+      "darkAfter": 103,
+      "extraMeters": 74,
+      "extraPct": 33,
+      "cutPct": 23,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by B1 Block",
+        "meters": 46
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "Sharda Pai Auditorium",
+      "meters": 503,
+      "darkBefore": 338,
+      "darkAfter": 262,
+      "extraMeters": 77,
+      "extraPct": 15,
+      "cutPct": 22,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Old Mess",
+        "meters": 78
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "Old Mess",
+      "meters": 363,
+      "darkBefore": 289,
+      "darkAfter": 231,
+      "extraMeters": 8,
+      "extraPct": 2,
+      "cutPct": 20,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 114
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "Sharda Pai Auditorium",
+      "meters": 399,
+      "darkBefore": 317,
+      "darkAfter": 259,
+      "extraMeters": 8,
+      "extraPct": 2,
+      "cutPct": 18,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 114
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "Old Mess",
+      "meters": 695,
+      "darkBefore": 338,
+      "darkAfter": 280,
+      "extraMeters": 7,
+      "extraPct": 1,
+      "cutPct": 17,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 114
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "Old Mess",
+      "meters": 601,
+      "darkBefore": 338,
+      "darkAfter": 280,
+      "extraMeters": 8,
+      "extraPct": 1,
+      "cutPct": 17,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 114
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "Old Mess",
+      "meters": 476,
+      "darkBefore": 257,
+      "darkAfter": 215,
+      "extraMeters": 17,
+      "extraPct": 4,
+      "cutPct": 16,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Old Mess",
+        "meters": 64
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "Old Mess",
+      "meters": 560,
+      "darkBefore": 257,
+      "darkAfter": 215,
+      "extraMeters": 57,
+      "extraPct": 10,
+      "cutPct": 16,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Old Mess",
+        "meters": 64
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "Old Mess",
+      "meters": 546,
+      "darkBefore": 257,
+      "darkAfter": 215,
+      "extraMeters": 64,
+      "extraPct": 12,
+      "cutPct": 16,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Old Mess",
+        "meters": 64
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "Old Mess",
+      "meters": 589,
+      "darkBefore": 257,
+      "darkAfter": 215,
+      "extraMeters": 63,
+      "extraPct": 11,
+      "cutPct": 16,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Old Mess",
+        "meters": 64
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "Sharda Pai Auditorium",
+      "meters": 731,
+      "darkBefore": 366,
+      "darkAfter": 308,
+      "extraMeters": 7,
+      "extraPct": 1,
+      "cutPct": 16,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 114
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "Sharda Pai Auditorium",
+      "meters": 637,
+      "darkBefore": 366,
+      "darkAfter": 308,
+      "extraMeters": 8,
+      "extraPct": 1,
+      "cutPct": 16,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 114
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "Sharda Pai Auditorium",
+      "meters": 512,
+      "darkBefore": 285,
+      "darkAfter": 243,
+      "extraMeters": 17,
+      "extraPct": 3,
+      "cutPct": 15,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Old Mess",
+        "meters": 78
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "Sharda Pai Auditorium",
+      "meters": 596,
+      "darkBefore": 285,
+      "darkAfter": 243,
+      "extraMeters": 57,
+      "extraPct": 10,
+      "cutPct": 15,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Old Mess",
+        "meters": 78
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "Sharda Pai Auditorium",
+      "meters": 582,
+      "darkBefore": 285,
+      "darkAfter": 243,
+      "extraMeters": 64,
+      "extraPct": 11,
+      "cutPct": 15,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Old Mess",
+        "meters": 78
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "Sharda Pai Auditorium",
+      "meters": 625,
+      "darkBefore": 285,
+      "darkAfter": 243,
+      "extraMeters": 63,
+      "extraPct": 10,
+      "cutPct": 15,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Old Mess",
+        "meters": 78
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "Old Mess",
+      "meters": 681,
+      "darkBefore": 387,
+      "darkAfter": 330,
+      "extraMeters": 10,
+      "extraPct": 1,
+      "cutPct": 15,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 114
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "TMA Pai Auditorium",
+      "meters": 594,
+      "darkBefore": 296,
+      "darkAfter": 257,
+      "extraMeters": 10,
+      "extraPct": 2,
+      "cutPct": 13,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "Sharda Pai Auditorium",
+      "meters": 717,
+      "darkBefore": 415,
+      "darkAfter": 359,
+      "extraMeters": 10,
+      "extraPct": 1,
+      "cutPct": 13,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 114
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "TMA Pai Auditorium",
+      "meters": 471,
+      "darkBefore": 312,
+      "darkAfter": 274,
+      "extraMeters": 10,
+      "extraPct": 2,
+      "cutPct": 12,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "TMA Pai Auditorium",
+      "meters": 537,
+      "darkBefore": 359,
+      "darkAfter": 321,
+      "extraMeters": 10,
+      "extraPct": 2,
+      "cutPct": 11,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "TMA Pai Auditorium",
+      "meters": 803,
+      "darkBefore": 361,
+      "darkAfter": 322,
+      "extraMeters": 10,
+      "extraPct": 1,
+      "cutPct": 11,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "TMA Pai Auditorium",
+      "meters": 709,
+      "darkBefore": 361,
+      "darkAfter": 322,
+      "extraMeters": 11,
+      "extraPct": 2,
+      "cutPct": 11,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "TMA Pai Auditorium",
+      "meters": 789,
+      "darkBefore": 409,
+      "darkAfter": 373,
+      "extraMeters": 12,
+      "extraPct": 2,
+      "cutPct": 9,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "AB1",
+      "meters": 258,
+      "darkBefore": 146,
+      "darkAfter": 138,
+      "extraMeters": 2,
+      "extraPct": 1,
+      "cutPct": 5,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway",
+        "meters": 41
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "Faculty Block 4",
+      "meters": 258,
+      "darkBefore": 146,
+      "darkAfter": 138,
+      "extraMeters": 2,
+      "extraPct": 1,
+      "cutPct": 5,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway",
+        "meters": 41
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "Library CCE",
+      "meters": 312,
+      "darkBefore": 151,
+      "darkAfter": 143,
+      "extraMeters": 2,
+      "extraPct": 1,
+      "cutPct": 5,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway",
+        "meters": 41
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "Officie Directorate of Academics",
+      "meters": 301,
+      "darkBefore": 156,
+      "darkAfter": 148,
+      "extraMeters": 2,
+      "extraPct": 1,
+      "cutPct": 5,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway",
+        "meters": 41
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "Old Mess",
+      "meters": 385,
+      "darkBefore": 210,
+      "darkAfter": 202,
+      "extraMeters": 2,
+      "extraPct": 1,
+      "cutPct": 4,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Old Mess",
+        "meters": 64
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "Subway entrance/exit",
+      "meters": 486,
+      "darkBefore": 175,
+      "darkAfter": 168,
+      "extraMeters": 21,
+      "extraPct": 4,
+      "cutPct": 4,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by G4 block",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "Subway entrance/exit",
+      "meters": 393,
+      "darkBefore": 175,
+      "darkAfter": 168,
+      "extraMeters": 21,
+      "extraPct": 5,
+      "cutPct": 4,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by G4 block",
+        "meters": 53
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "Sharda Pai Auditorium",
+      "meters": 421,
+      "darkBefore": 238,
+      "darkAfter": 230,
+      "extraMeters": 2,
+      "extraPct": 0,
+      "cutPct": 3,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Old Mess",
+        "meters": 78
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "FB Entrance",
+      "meters": 310,
+      "darkBefore": 164,
+      "darkAfter": 160,
+      "extraMeters": 9,
+      "extraPct": 3,
+      "cutPct": 2,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway",
+        "meters": 41
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "Subway entrance/exit",
+      "meters": 473,
+      "darkBefore": 224,
+      "darkAfter": 219,
+      "extraMeters": 22,
+      "extraPct": 5,
+      "cutPct": 2,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by Bluedove Mess",
+        "meters": 53
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "AB1",
+      "meters": 239,
+      "darkBefore": 114,
+      "darkAfter": 112,
+      "extraMeters": 4,
+      "extraPct": 2,
+      "cutPct": 2,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "Faculty Block 4",
+      "meters": 239,
+      "darkBefore": 114,
+      "darkAfter": 112,
+      "extraMeters": 4,
+      "extraPct": 2,
+      "cutPct": 2,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "Library CCE",
+      "meters": 293,
+      "darkBefore": 119,
+      "darkAfter": 117,
+      "extraMeters": 4,
+      "extraPct": 1,
+      "cutPct": 2,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "Officie Directorate of Academics",
+      "meters": 282,
+      "darkBefore": 124,
+      "darkAfter": 122,
+      "extraMeters": 5,
+      "extraPct": 2,
+      "cutPct": 2,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "AB2",
+      "meters": 520,
+      "darkBefore": 372,
+      "darkAfter": 370,
+      "extraMeters": 10,
+      "extraPct": 2,
+      "cutPct": 1,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "AB1",
+      "meters": 570,
+      "darkBefore": 163,
+      "darkAfter": 161,
+      "extraMeters": 5,
+      "extraPct": 1,
+      "cutPct": 1,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "Faculty Block 4",
+      "meters": 570,
+      "darkBefore": 163,
+      "darkAfter": 161,
+      "extraMeters": 5,
+      "extraPct": 1,
+      "cutPct": 1,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "Library CCE",
+      "meters": 625,
+      "darkBefore": 168,
+      "darkAfter": 166,
+      "extraMeters": 4,
+      "extraPct": 1,
+      "cutPct": 1,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "Officie Directorate of Academics",
+      "meters": 614,
+      "darkBefore": 173,
+      "darkAfter": 171,
+      "extraMeters": 5,
+      "extraPct": 1,
+      "cutPct": 1,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "AB1",
+      "meters": 477,
+      "darkBefore": 163,
+      "darkAfter": 161,
+      "extraMeters": 4,
+      "extraPct": 1,
+      "cutPct": 1,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "Faculty Block 4",
+      "meters": 477,
+      "darkBefore": 163,
+      "darkAfter": 161,
+      "extraMeters": 4,
+      "extraPct": 1,
+      "cutPct": 1,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "Library CCE",
+      "meters": 531,
+      "darkBefore": 168,
+      "darkAfter": 166,
+      "extraMeters": 5,
+      "extraPct": 1,
+      "cutPct": 1,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "Officie Directorate of Academics",
+      "meters": 521,
+      "darkBefore": 173,
+      "darkAfter": 171,
+      "extraMeters": 4,
+      "extraPct": 1,
+      "cutPct": 1,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "Academic Block -3",
+      "meters": 413,
+      "darkBefore": 316,
+      "darkAfter": 316,
+      "extraMeters": 13,
+      "extraPct": 3,
+      "cutPct": 0,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 95
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "Administrative Block",
+      "meters": 354,
+      "darkBefore": 170,
+      "darkAfter": 170,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "BABA",
+      "meters": 300,
+      "darkBefore": 68,
+      "darkAfter": 68,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by Subway Entrance",
+        "meters": 28
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "Central Library",
+      "meters": 282,
+      "darkBefore": 170,
+      "darkAfter": 170,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "NBC",
+      "meters": 349,
+      "darkBefore": 68,
+      "darkAfter": 68,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by Subway Entrance",
+        "meters": 28
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "Subway",
+      "meters": 63,
+      "darkBefore": 28,
+      "darkAfter": 28,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by Subway",
+        "meters": 25
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "Subway Entrance",
+      "meters": 46,
+      "darkBefore": 25,
+      "darkAfter": 25,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by Subway",
+        "meters": 25
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "Subway entrance/exit",
+      "meters": 134,
+      "darkBefore": 87,
+      "darkAfter": 87,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Footpath by Subway",
+        "meters": 41
+      }
+    },
+    {
+      "from": "B1 Block",
+      "to": "University Entrance",
+      "meters": 128,
+      "darkBefore": 83,
+      "darkAfter": 83,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by Subway Entrance",
+        "meters": 28
+      }
+    },
+    {
+      "from": "B2 block",
+      "to": "Quess Mess & Gym complex",
+      "meters": 169,
+      "darkBefore": 19,
+      "darkAfter": 19,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Walkway by B2 block",
+        "meters": 19
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "AB2",
+      "meters": 577,
+      "darkBefore": 308,
+      "darkAfter": 307,
+      "extraMeters": 10,
+      "extraPct": 2,
+      "cutPct": 0,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "Administrative Block",
+      "meters": 411,
+      "darkBefore": 106,
+      "darkAfter": 106,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "BABA",
+      "meters": 356,
+      "darkBefore": 4,
+      "darkAfter": 4,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by Hostel Entrance",
+        "meters": 4
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "Central Library",
+      "meters": 339,
+      "darkBefore": 106,
+      "darkAfter": 106,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "Faculty Block Entrance",
+      "meters": 278,
+      "darkBefore": 0,
+      "darkAfter": 0,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": null
+    },
+    {
+      "from": "B3 Block",
+      "to": "NBC",
+      "meters": 406,
+      "darkBefore": 4,
+      "darkAfter": 4,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by Hostel Entrance",
+        "meters": 4
+      }
+    },
+    {
+      "from": "B3 Block",
+      "to": "Quess Mess & Gym complex",
+      "meters": 82,
+      "darkBefore": 0,
+      "darkAfter": 0,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": null
+    },
+    {
+      "from": "B3 Block",
+      "to": "University Entrance",
+      "meters": 184,
+      "darkBefore": 19,
+      "darkAfter": 19,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Road by University Entrance",
+        "meters": 15
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "Bluedove Mess",
+      "meters": 181,
+      "darkBefore": 27,
+      "darkAfter": 27,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by Bluedove Mess",
+        "meters": 27
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "Faculty Block Entrance",
+      "meters": 402,
+      "darkBefore": 0,
+      "darkAfter": 0,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": null
+    },
+    {
+      "from": "B5 block",
+      "to": "Quess Mess & Gym complex",
+      "meters": 100,
+      "darkBefore": 0,
+      "darkAfter": 0,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": null
+    },
+    {
+      "from": "B6 block",
+      "to": "Bluedove Mess",
+      "meters": 234,
+      "darkBefore": 27,
+      "darkAfter": 27,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by Bluedove Mess",
+        "meters": 27
+      }
+    },
+    {
+      "from": "B6 block",
+      "to": "Quess Mess & Gym complex",
+      "meters": 153,
+      "darkBefore": 0,
+      "darkAfter": 0,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": null
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "Bluedove Mess",
+      "meters": 190,
+      "darkBefore": 27,
+      "darkAfter": 27,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by Bluedove Mess",
+        "meters": 27
+      }
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "Quess Mess & Gym complex",
+      "meters": 110,
+      "darkBefore": 0,
+      "darkAfter": 0,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": null
+    },
+    {
+      "from": "B7 Boy's Block",
+      "to": "zanak",
+      "meters": 815,
+      "darkBefore": 490,
+      "darkAfter": 490,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by NBC",
+        "meters": 243
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "AB2",
+      "meters": 786,
+      "darkBefore": 373,
+      "darkAfter": 372,
+      "extraMeters": 10,
+      "extraPct": 1,
+      "cutPct": 0,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "Academic Block -3",
+      "meters": 730,
+      "darkBefore": 339,
+      "darkAfter": 339,
+      "extraMeters": 12,
+      "extraPct": 2,
+      "cutPct": 0,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 128
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "Administrative Block",
+      "meters": 620,
+      "darkBefore": 171,
+      "darkAfter": 171,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "BABA",
+      "meters": 566,
+      "darkBefore": 69,
+      "darkAfter": 69,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Walkway by G4 block",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "Bluedove Mess",
+      "meters": 147,
+      "darkBefore": 53,
+      "darkAfter": 53,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Walkway by G4 block",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "Central Library",
+      "meters": 548,
+      "darkBefore": 171,
+      "darkAfter": 171,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "Faculty Block Entrance",
+      "meters": 457,
+      "darkBefore": 65,
+      "darkAfter": 65,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Walkway by G4 block",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "NBC",
+      "meters": 615,
+      "darkBefore": 69,
+      "darkAfter": 69,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Walkway by G4 block",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "Quess Mess & Gym complex",
+      "meters": 228,
+      "darkBefore": 80,
+      "darkAfter": 80,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Walkway by G4 block",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "Subway",
+      "meters": 415,
+      "darkBefore": 116,
+      "darkAfter": 116,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Walkway by G4 block",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "Subway Entrance",
+      "meters": 399,
+      "darkBefore": 113,
+      "darkAfter": 113,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Walkway by G4 block",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "University Entrance",
+      "meters": 394,
+      "darkBefore": 84,
+      "darkAfter": 84,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Walkway by G4 block",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "AB1",
+      "meters": 557,
+      "darkBefore": 212,
+      "darkAfter": 212,
+      "extraMeters": 6,
+      "extraPct": 1,
+      "cutPct": 0,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "AB2",
+      "meters": 773,
+      "darkBefore": 422,
+      "darkAfter": 422,
+      "extraMeters": 12,
+      "extraPct": 2,
+      "cutPct": 0,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "Administrative Block",
+      "meters": 607,
+      "darkBefore": 220,
+      "darkAfter": 221,
+      "extraMeters": 1,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "Central Library",
+      "meters": 535,
+      "darkBefore": 220,
+      "darkAfter": 221,
+      "extraMeters": 1,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "Faculty Block 4",
+      "meters": 557,
+      "darkBefore": 212,
+      "darkAfter": 212,
+      "extraMeters": 6,
+      "extraPct": 1,
+      "cutPct": 0,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "Library CCE",
+      "meters": 611,
+      "darkBefore": 217,
+      "darkAfter": 216,
+      "extraMeters": 6,
+      "extraPct": 1,
+      "cutPct": 0,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "Officie Directorate of Academics",
+      "meters": 601,
+      "darkBefore": 222,
+      "darkAfter": 221,
+      "extraMeters": 6,
+      "extraPct": 1,
+      "cutPct": 0,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "AB2",
+      "meters": 693,
+      "darkBefore": 373,
+      "darkAfter": 372,
+      "extraMeters": 10,
+      "extraPct": 1,
+      "cutPct": 0,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "Academic Block -3",
+      "meters": 636,
+      "darkBefore": 339,
+      "darkAfter": 339,
+      "extraMeters": 13,
+      "extraPct": 2,
+      "cutPct": 0,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 128
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "Administrative Block",
+      "meters": 527,
+      "darkBefore": 171,
+      "darkAfter": 171,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "BABA",
+      "meters": 472,
+      "darkBefore": 69,
+      "darkAfter": 69,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Walkway by G4 block",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "Bluedove Mess",
+      "meters": 53,
+      "darkBefore": 53,
+      "darkAfter": 53,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Walkway by G4 block",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "Central Library",
+      "meters": 455,
+      "darkBefore": 171,
+      "darkAfter": 171,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "Faculty Block Entrance",
+      "meters": 363,
+      "darkBefore": 65,
+      "darkAfter": 65,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Walkway by G4 block",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "NBC",
+      "meters": 522,
+      "darkBefore": 69,
+      "darkAfter": 69,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Walkway by G4 block",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "Quess Mess & Gym complex",
+      "meters": 134,
+      "darkBefore": 80,
+      "darkAfter": 80,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Walkway by G4 block",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "Subway",
+      "meters": 322,
+      "darkBefore": 116,
+      "darkAfter": 116,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Walkway by G4 block",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "Subway Entrance",
+      "meters": 305,
+      "darkBefore": 113,
+      "darkAfter": 113,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Walkway by G4 block",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "University Entrance",
+      "meters": 300,
+      "darkBefore": 84,
+      "darkAfter": 84,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Walkway by G4 block",
+        "meters": 53
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "AB2",
+      "meters": 454,
+      "darkBefore": 324,
+      "darkAfter": 323,
+      "extraMeters": 11,
+      "extraPct": 2,
+      "cutPct": 0,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Central Library",
+        "meters": 122
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "Academic Block -3",
+      "meters": 398,
+      "darkBefore": 291,
+      "darkAfter": 290,
+      "extraMeters": 13,
+      "extraPct": 3,
+      "cutPct": 0,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 128
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "Administrative Block",
+      "meters": 288,
+      "darkBefore": 122,
+      "darkAfter": 122,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "BABA",
+      "meters": 234,
+      "darkBefore": 21,
+      "darkAfter": 21,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by Hostel Entrance",
+        "meters": 15
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "Bluedove Mess",
+      "meters": 226,
+      "darkBefore": 37,
+      "darkAfter": 37,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by Hostel Entrance",
+        "meters": 20
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "Central Library",
+      "meters": 217,
+      "darkBefore": 122,
+      "darkAfter": 122,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "Faculty Block Entrance",
+      "meters": 164,
+      "darkBefore": 25,
+      "darkAfter": 25,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by Hostel Entrance",
+        "meters": 20
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "NBC",
+      "meters": 284,
+      "darkBefore": 21,
+      "darkAfter": 21,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by Hostel Entrance",
+        "meters": 15
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "Quess Mess & Gym complex",
+      "meters": 221,
+      "darkBefore": 25,
+      "darkAfter": 25,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by Hostel Entrance",
+        "meters": 20
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "Subway",
+      "meters": 54,
+      "darkBefore": 37,
+      "darkAfter": 37,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by Subway Entrance",
+        "meters": 28
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "Subway Entrance",
+      "meters": 37,
+      "darkBefore": 34,
+      "darkAfter": 34,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by Subway Entrance",
+        "meters": 28
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "Subway entrance/exit",
+      "meters": 125,
+      "darkBefore": 96,
+      "darkAfter": 96,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Footpath by Subway",
+        "meters": 41
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "University Entrance",
+      "meters": 62,
+      "darkBefore": 36,
+      "darkAfter": 36,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 0,
+      "identical": true,
+      "worstAvoided": {
+        "label": "Service road by Hostel Entrance",
+        "meters": 15
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "FB Entrance",
+      "meters": 623,
+      "darkBefore": 182,
+      "darkAfter": 184,
+      "extraMeters": 11,
+      "extraPct": 2,
+      "cutPct": -1,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "Academic Block -3",
+      "meters": 716,
+      "darkBefore": 388,
+      "darkAfter": 390,
+      "extraMeters": 15,
+      "extraPct": 2,
+      "cutPct": -1,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 128
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "FB Entrance",
+      "meters": 610,
+      "darkBefore": 231,
+      "darkAfter": 234,
+      "extraMeters": 12,
+      "extraPct": 2,
+      "cutPct": -1,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "Faculty Block Entrance",
+      "meters": 443,
+      "darkBefore": 114,
+      "darkAfter": 115,
+      "extraMeters": 2,
+      "extraPct": 0,
+      "cutPct": -1,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by Bluedove Mess",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "Subway",
+      "meters": 402,
+      "darkBefore": 165,
+      "darkAfter": 166,
+      "extraMeters": 2,
+      "extraPct": 0,
+      "cutPct": -1,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by Bluedove Mess",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "Subway Entrance",
+      "meters": 385,
+      "darkBefore": 161,
+      "darkAfter": 163,
+      "extraMeters": 2,
+      "extraPct": 1,
+      "cutPct": -1,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by Bluedove Mess",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "FB Entrance",
+      "meters": 530,
+      "darkBefore": 182,
+      "darkAfter": 184,
+      "extraMeters": 11,
+      "extraPct": 2,
+      "cutPct": -1,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "BABA",
+      "meters": 552,
+      "darkBefore": 118,
+      "darkAfter": 120,
+      "extraMeters": 2,
+      "extraPct": 0,
+      "cutPct": -2,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by Bluedove Mess",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "Bluedove Mess",
+      "meters": 133,
+      "darkBefore": 102,
+      "darkAfter": 104,
+      "extraMeters": 2,
+      "extraPct": 2,
+      "cutPct": -2,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by Bluedove Mess",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "NBC",
+      "meters": 602,
+      "darkBefore": 118,
+      "darkAfter": 120,
+      "extraMeters": 2,
+      "extraPct": 0,
+      "cutPct": -2,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by Bluedove Mess",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "Quess Mess & Gym complex",
+      "meters": 214,
+      "darkBefore": 129,
+      "darkAfter": 131,
+      "extraMeters": 2,
+      "extraPct": 1,
+      "cutPct": -2,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by Bluedove Mess",
+        "meters": 53
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "University Entrance",
+      "meters": 380,
+      "darkBefore": 133,
+      "darkAfter": 135,
+      "extraMeters": 2,
+      "extraPct": 1,
+      "cutPct": -2,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Walkway by Bluedove Mess",
+        "meters": 53
+      }
+    },
+    {
+      "from": "Hostel Entrance",
+      "to": "FB Entrance",
+      "meters": 291,
+      "darkBefore": 133,
+      "darkAfter": 135,
+      "extraMeters": 11,
+      "extraPct": 4,
+      "cutPct": -2,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by Subway entrance/exit",
+        "meters": 64
+      }
+    }
+  ],
+  "headline": {
+    "from": "B3 Block",
+    "to": "zanak",
+    "meters": 739,
+    "darkBefore": 382,
+    "darkAfter": 4,
+    "extraMeters": 1,
+    "extraPct": 0,
+    "cutPct": 99,
+    "identical": false,
+    "worstAvoided": {
+      "label": "Footpath by NBC",
+      "meters": 159
+    }
+  },
+  "bestValue": [
+    {
+      "from": "B3 Block",
+      "to": "zanak",
+      "meters": 739,
+      "darkBefore": 382,
+      "darkAfter": 4,
+      "extraMeters": 1,
+      "extraPct": 0,
+      "cutPct": 99,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by NBC",
+        "meters": 159
+      }
+    },
+    {
+      "from": "G2 block",
+      "to": "zanak",
+      "meters": 948,
+      "darkBefore": 447,
+      "darkAfter": 69,
+      "extraMeters": 1,
+      "extraPct": 0,
+      "cutPct": 85,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by NBC",
+        "meters": 159
+      }
+    },
+    {
+      "from": "G4 block",
+      "to": "zanak",
+      "meters": 855,
+      "darkBefore": 447,
+      "darkAfter": 69,
+      "extraMeters": 0,
+      "extraPct": 0,
+      "cutPct": 85,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by NBC",
+        "meters": 159
+      }
+    },
+    {
+      "from": "G3 block",
+      "to": "zanak",
+      "meters": 935,
+      "darkBefore": 496,
+      "darkAfter": 120,
+      "extraMeters": 2,
+      "extraPct": 0,
+      "cutPct": 76,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by NBC",
+        "meters": 159
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "Administrative Block",
+      "meters": 529,
+      "darkBefore": 216,
+      "darkAfter": 106,
+      "extraMeters": 6,
+      "extraPct": 1,
+      "cutPct": 51,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    },
+    {
+      "from": "B5 block",
+      "to": "Central Library",
+      "meters": 457,
+      "darkBefore": 216,
+      "darkAfter": 106,
+      "extraMeters": 6,
+      "extraPct": 1,
+      "cutPct": 51,
+      "identical": false,
+      "worstAvoided": {
+        "label": "Footpath by University Entrance",
+        "meters": 72
+      }
+    }
+  ],
+  "routing": {
+    "total": 220,
+    "diverged": 165,
+    "medianCutPct": 27,
+    "medianDetourPct": 3
+  }
+}

@@ -1,0 +1,669 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import type { Map as LMap, LayerGroup, Canvas } from 'leaflet';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { RouteStats } from './RouteStats';
+import { PathInspector, type PathInfo } from './PathInspector';
+
+/** [aLat, aLng, bLat, bLng, risk, darkness, exposure, wayId] */
+type Segment = [number, number, number, number, number, number, number, number];
+type MapMode = 'none' | 'report' | 'inspect';
+type Place = { name: string; at: { lat: number; lng: number }; node: number; kind: 'hostel' | 'dest' };
+
+export type Stats = {
+  totalKm: number;
+  darkKm: number;
+  darkPct: number;
+  highRiskSegments: number;
+  highRiskKm: number;
+  hostels: number;
+  destinations: number;
+  citizenReports: number;
+};
+
+type RouteLeg = {
+  coords: [number, number][];
+  segments: number[];
+  meters: number;
+  darkMeters: number;
+  darkStretches: { label: string; meters: number }[];
+};
+
+export type RoutePair = {
+  shortest: RouteLeg;
+  safest: RouteLeg;
+  detourMeters: number;
+  detourPct: number;
+  darkReductionPct: number;
+  identical: boolean;
+};
+
+const LIT = 0.5; // darkness at or below this reads as "lit"
+
+/** A user reports a stretch they can actually see, not a whole path. */
+const MAX_REPORT_M = 50;
+
+/**
+ * Four categories, four clearly different hues.
+ *
+ * The earlier palette put danger on a single red-to-maroon ramp, and at map
+ * scale those two were indistinguishable from each other and muddy against the
+ * yellow. So the categories now separate by HUE, not by shade of one colour:
+ * yellow / red / violet / slate. Violet for mid-traffic reads as cooler and
+ * less urgent than red without being confusable with either neighbour.
+ *
+ * Darkness is tested BEFORE risk on purpose. Risk is exposure x darkness, so a
+ * busy but well-lit path still scores a middling risk — checking risk first
+ * painted the busiest lit paths orange and called them dangerous, which is
+ * exactly backwards.
+ */
+const C = {
+  lit: '#FFD60A', // bright yellow — lamplight
+  busyDark: '#FF375F', // vivid red — dark AND busy
+  moderate: '#8B5CF6', // violet — dark, some traffic
+  quietDark: '#3E4A63', // slate — dark, nobody walks it
+  muted: '#232838', // off-route, when a walk is being shown
+  bulbCore: '#FFF3B0', // the safer route itself
+  bulbGlow: '#FFB300',
+} as const;
+
+function segColor(risk: number, darkness: number): string {
+  if (darkness <= LIT) return C.lit;
+  if (risk > 0.3) return C.busyDark;
+  if (risk > 0.12) return C.moderate;
+  return C.quietDark;
+}
+
+function segWeight(risk: number, exposure: number, darkness: number): number {
+  if (darkness <= LIT) return 1.6;
+  if (risk > 0.3) return 3.5;
+  if (risk > 0.12) return 2.8;
+  return exposure > 0.05 ? 2 : 1;
+}
+
+/** Perpendicular distance in metres from a point to a segment. */
+function distToSeg(lat: number, lng: number, s: Segment): number {
+  const mLat = 111320;
+  const mLng = 111320 * Math.cos((lat * Math.PI) / 180);
+  const px = lng * mLng;
+  const py = lat * mLat;
+  const x1 = s[1] * mLng;
+  const y1 = s[0] * mLat;
+  const x2 = s[3] * mLng;
+  const y2 = s[2] * mLat;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  if (dx === 0 && dy === 0) return Math.hypot(px - x1, py - y1);
+  let t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy);
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
+export function DarkZoneMap() {
+  const holder = useRef<HTMLDivElement>(null);
+  const map = useRef<LMap | null>(null);
+  const routeLayer = useRef<LayerGroup | null>(null);
+  const baseLayer = useRef<LayerGroup | null>(null);
+  const glowLayer = useRef<LayerGroup | null>(null);
+  const hoverLayer = useRef<LayerGroup | null>(null);
+  const LRef = useRef<typeof import('leaflet') | null>(null);
+  const glowRenderer = useRef<Canvas | null>(null);
+  const segRef = useRef<Segment[]>([]);
+  // Leaflet binds handlers once, so they must read modes through refs.
+  const modeRef = useRef<MapMode>('none');
+  const hoverRef = useRef<string | null>(null);
+  const focusRef = useRef<Set<number> | null>(null);
+  const planRef = useRef<RoutePair | null>(null);
+
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [plan, setPlan] = useState<RoutePair | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [mode, setMode] = useState<MapMode>('none');
+  const [reports, setReports] = useState(0);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [selected, setSelected] = useState<PathInfo | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const L = await import('leaflet');
+      await import('leaflet/dist/leaflet.css');
+      if (cancelled || !holder.current || map.current) return;
+      LRef.current = L;
+
+      const m = L.map(holder.current, {
+        zoomControl: false,
+        preferCanvas: true, // ~1.9k polylines: SVG would crawl, canvas does not
+      }).setView([26.8425, 75.563], 16);
+      L.control.zoom({ position: 'bottomright' }).addTo(m);
+
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+        maxZoom: 19,
+      }).addTo(m);
+
+      // A blurred pane under the streets turns the lit paths into lamplight
+      // rather than just another colour. One extra draw pass, no image work.
+      m.createPane('glow');
+      const gp = m.getPane('glow')!;
+      gp.style.zIndex = '350';
+      gp.style.filter = 'blur(5px)';
+      gp.style.pointerEvents = 'none';
+      glowRenderer.current = L.canvas({ pane: 'glow' });
+
+      map.current = m;
+      glowLayer.current = L.layerGroup().addTo(m);
+      baseLayer.current = L.layerGroup().addTo(m);
+      hoverLayer.current = L.layerGroup().addTo(m);
+      routeLayer.current = L.layerGroup().addTo(m);
+
+      const data: { segments: Segment[]; places: Place[]; stats: Stats } = await fetch(
+        '/api/graph',
+      ).then((r) => r.json());
+      if (cancelled) return;
+
+      segRef.current = data.segments;
+      setStats(data.stats);
+      paintSegments(data.segments, null);
+
+      for (const p of data.places) {
+        L.circleMarker([p.at.lat, p.at.lng], {
+          radius: p.kind === 'hostel' ? 5 : 4,
+          color: p.kind === 'hostel' ? '#93c5fd' : '#cbd5e1',
+          fillColor: p.kind === 'hostel' ? '#3b82f6' : '#94a3b8',
+          fillOpacity: 0.9,
+          weight: 1.5,
+        })
+          .bindTooltip(p.name, { direction: 'top' })
+          .addTo(m);
+      }
+
+      // Hover preview: highlight the whole path the cursor is over, so you can
+      // see what you are about to pick before committing to it.
+      m.on('mousemove', (ev: L.LeafletMouseEvent) => {
+        if (modeRef.current === 'none') return;
+        const span = spanAt(ev.latlng.lat, ev.latlng.lng);
+        const key = span?.indices.join(',') ?? null;
+        if (key === hoverRef.current) return;
+        hoverRef.current = key;
+        drawHover(span?.indices ?? null);
+      });
+
+      m.on('click', (ev: L.LeafletMouseEvent) => {
+        if (modeRef.current === 'none') return;
+        if (!spanAt(ev.latlng.lat, ev.latlng.lng)) return;
+        void openPath(ev.latlng.lat, ev.latlng.lng);
+      });
+
+      setPlaces(data.places);
+      const pick = (want: string, kind: Place['kind']) =>
+        data.places.find((p) => p.name.toLowerCase().includes(want))?.name ??
+        data.places.find((p) => p.kind === kind)?.name ??
+        '';
+      setFrom(pick('b3 block', 'hostel'));
+      setTo(pick('zanak', 'dest'));
+      setReady(true);
+    })();
+
+    return () => {
+      cancelled = true;
+      map.current?.remove();
+      map.current = null;
+    };
+  }, []);
+
+  /**
+   * The stretch under the cursor that a report would cover.
+   *
+   * Mirrors spanAt() on the server exactly — same path, nearest segments first,
+   * stopping at MAX_REPORT_M — so the highlight the user sees IS what gets
+   * recorded. Segment order matches /api/graph, so indices are sent as-is.
+   */
+  function spanAt(lat: number, lng: number): { indices: number[]; meters: number } | null {
+    const z = map.current?.getZoom() ?? 16;
+    // ~25 m at z16, tightening as you zoom in so dense areas stay selectable.
+    const grab = 25 * Math.pow(2, 16 - z);
+
+    let seed = -1;
+    let bd = Infinity;
+    const segs = segRef.current;
+    for (let i = 0; i < segs.length; i++) {
+      const d = distToSeg(lat, lng, segs[i]);
+      if (d < bd) {
+        bd = d;
+        seed = i;
+      }
+    }
+    if (seed < 0 || bd > grab) return null;
+
+    const wayId = segs[seed][7];
+    const ranked: { i: number; d: number }[] = [];
+    for (let i = 0; i < segs.length; i++) {
+      if (segs[i][7] !== wayId) continue;
+      ranked.push({ i, d: distToSeg(lat, lng, segs[i]) });
+    }
+    ranked.sort((a, b) => a.d - b.d);
+
+    const indices: number[] = [];
+    let meters = 0;
+    for (const { i } of ranked) {
+      const s = segs[i];
+      const len = Math.hypot(
+        (s[2] - s[0]) * 111320,
+        (s[3] - s[1]) * 111320 * Math.cos((s[0] * Math.PI) / 180),
+      );
+      if (indices.length && meters + len > MAX_REPORT_M) continue;
+      indices.push(i);
+      meters += len;
+      if (meters >= MAX_REPORT_M) break;
+    }
+    return { indices, meters: Math.round(meters) };
+  }
+
+  function drawHover(indices: number[] | null) {
+    const L = LRef.current;
+    const layer = hoverLayer.current;
+    if (!L || !layer) return;
+    layer.clearLayers();
+    if (!indices?.length) return;
+    for (const i of indices) {
+      const s = segRef.current[i];
+      if (!s) continue;
+      L.polyline(
+        [
+          [s[0], s[1]],
+          [s[2], s[3]],
+        ],
+        { color: '#ffffff', weight: 9, opacity: 0.45, lineCap: 'round' },
+      ).addTo(layer);
+    }
+  }
+
+  /**
+   * Draw the network.
+   *
+   * `focus` is the set of segment indices on the planned route. When it is set,
+   * everything else drops to a faint outline and stops glowing — 71% of this
+   * campus is lit, so at full strength the gold drowns the very route the user
+   * just asked for. Focused, the question becomes readable: which parts of MY
+   * walk are lit, and which are not.
+   */
+  function paintSegments(segments: Segment[], focus: Set<number> | null) {
+    const L = LRef.current;
+    if (!L || !baseLayer.current || !glowLayer.current) return;
+    baseLayer.current.clearLayers();
+    glowLayer.current.clearLayers();
+
+    for (let i = 0; i < segments.length; i++) {
+      const [aLat, aLng, bLat, bLng, risk, darkness, exposure] = segments[i];
+      const line: [number, number][] = [
+        [aLat, aLng],
+        [bLat, bLng],
+      ];
+
+      // Off-route while a walk is being shown: present, but out of the way.
+      if (focus !== null && !focus.has(i)) {
+        L.polyline(line, { color: C.muted, weight: 1, opacity: 0.55 }).addTo(baseLayer.current);
+        continue;
+      }
+
+      // Flat colour everywhere. Nothing on the network glows — the glow is
+      // reserved for the safer route, where it means "take this one".
+      L.polyline(line, {
+        color: segColor(risk, darkness),
+        weight: (focus ? 2 : 0) + segWeight(risk, exposure, darkness),
+        opacity: focus ? 1 : 0.85,
+      }).addTo(baseLayer.current);
+    }
+  }
+
+  /**
+   * The safer route, drawn as a filament: a wide amber bloom in the blurred
+   * pane with a near-white core on top. This is the ONLY thing on the map that
+   * glows, so "the lit way home" is the single thing the eye is drawn to.
+   */
+  function drawRoutes(p: RoutePair) {
+    const L = LRef.current;
+    const layer = routeLayer.current;
+    if (!L || !layer || !glowLayer.current) return;
+    layer.clearLayers();
+
+    // Shortest route: a thin dashed reference line. Its danger is already
+    // visible underneath in red, which is the comparison being made.
+    layer.addLayer(
+      L.polyline(p.shortest.coords, {
+        color: '#E8ECF4',
+        weight: 2,
+        opacity: 0.85,
+        dashArray: '2 6',
+        lineCap: 'round',
+      }),
+    );
+
+    for (const [w, o] of [
+      [16, 0.28],
+      [9, 0.45],
+    ] as const) {
+      L.polyline(p.safest.coords, {
+        color: C.bulbGlow,
+        weight: w,
+        opacity: o,
+        lineCap: 'round',
+        renderer: glowRenderer.current ?? undefined,
+        pane: 'glow',
+      }).addTo(glowLayer.current);
+    }
+
+    layer.addLayer(
+      L.polyline(p.safest.coords, {
+        color: C.bulbCore,
+        weight: 3,
+        opacity: 1,
+        lineCap: 'round',
+      }),
+    );
+  }
+
+  async function refreshGraph() {
+    const fresh: { segments: Segment[]; stats: Stats } = await fetch('/api/graph').then((r) =>
+      r.json(),
+    );
+    segRef.current = fresh.segments;
+    setStats(fresh.stats);
+    // Repainting clears the glow pane, so any live route must be redrawn.
+    paintSegments(fresh.segments, focusRef.current);
+    if (planRef.current) drawRoutes(planRef.current);
+  }
+
+  /** Resolve the clicked path and show it for confirmation — never fire blind. */
+  async function openPath(lat: number, lng: number) {
+    try {
+      const d: PathInfo = await fetch('/api/inspect', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ lat, lng }),
+      }).then((r) => r.json());
+      setSelected(d);
+      if (modeRef.current === 'inspect') {
+        await navigator.clipboard?.writeText(d.lightingSnippet).catch(() => {});
+      }
+    } catch {
+      toast.error('Could not identify that path.');
+    }
+  }
+
+  async function submitReport(span: number[], dark: boolean) {
+    try {
+      const r = await fetch('/api/report', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ span, dark }),
+      }).then((x) => x.json());
+
+      setReports(r.totalReports);
+      await refreshGraph();
+      setSelected(null);
+      hoverRef.current = null;
+      drawHover(null);
+
+      toast.success(`${r.label} · ${r.meters} m — ${dark ? 'reported unlit' : 'reported lit'}`, {
+        description:
+          `${r.verdict} Darkness ${Math.round(r.darknessBefore * 100)}% → ${Math.round(r.darknessAfter * 100)}%.` +
+          (r.queueRank > 0
+            ? ` Repair queue #${r.queueRank}${r.darkReports + r.litReports < 2 ? ', unconfirmed' : ''} — ${r.benefitPct}% of campus risk.`
+            : ' Too little foot traffic to enter the repair queue.'),
+        duration: 7000,
+      });
+    } catch {
+      toast.error('Could not file that report.');
+    }
+  }
+
+  function toggleMode(next: MapMode) {
+    const value = mode === next ? 'none' : next;
+    setMode(value);
+    modeRef.current = value;
+    setSelected(null);
+    hoverRef.current = null;
+    drawHover(null);
+  }
+
+  function clearRoute() {
+    setPlan(null);
+    focusRef.current = null;
+    planRef.current = null;
+    routeLayer.current?.clearLayers();
+    paintSegments(segRef.current, null);
+  }
+
+  async function findRoute() {
+    if (!from || !to || from === to) return;
+    setLoading(true);
+    try {
+      const p: RoutePair = await fetch('/api/route-plan', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ from, to }),
+      }).then((r) => r.json());
+      setPlan(p);
+
+      const L = LRef.current;
+      if (!L || !map.current) return;
+
+      // Focus on both routes together: the comparison is the whole point, so
+      // muting the shortest one would hide what the safer route is avoiding.
+      // paintSegments clears the glow pane, so it must run before drawRoutes.
+      focusRef.current = new Set([...p.shortest.segments, ...p.safest.segments]);
+      planRef.current = p;
+      paintSegments(segRef.current, focusRef.current);
+      drawRoutes(p);
+
+      map.current.fitBounds(
+        L.polyline(p.safest.coords).getBounds().pad(0.18),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div
+      className={`relative h-full ${mode === 'none' ? '' : '[&_.leaflet-container]:cursor-crosshair'}`}
+    >
+      <div ref={holder} className="absolute inset-0" />
+
+      {/* Desktop: a column down the left. Phone: a sheet along the bottom that
+          never covers more than half the map, because the map is the point. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1000] flex max-h-[52dvh] flex-col gap-3 overflow-y-auto p-3 sm:inset-y-0 sm:right-auto sm:max-h-none sm:w-full sm:max-w-sm sm:p-4">
+        <div className="pointer-events-auto rounded-xl border bg-card/95 p-4 shadow-lg backdrop-blur">
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className="text-sm font-semibold">Plan a night walk</h2>
+            {stats ? (
+              <span className="text-[11px] text-muted-foreground">
+                {stats.hostels} blocks · {stats.destinations} places
+              </span>
+            ) : null}
+          </div>
+          <div className="space-y-2">
+            <label className="block text-xs text-muted-foreground">
+              From
+              <PlaceSelect places={places} value={from} onChange={setFrom} />
+            </label>
+            <label className="block text-xs text-muted-foreground">
+              To
+              <PlaceSelect places={places} value={to} onChange={setTo} />
+            </label>
+            <Button className="w-full" onClick={findRoute} disabled={!ready || loading || from === to}>
+              {loading ? 'Routing…' : 'Find the safer walk'}
+            </Button>
+            {plan ? (
+              <Button variant="ghost" size="sm" className="w-full" onClick={clearRoute}>
+                Show the whole campus
+              </Button>
+            ) : null}
+          </div>
+        </div>
+
+        {selected ? (
+          <div className="pointer-events-auto">
+            <PathInspector
+              info={selected}
+              mode={mode}
+              onReport={submitReport}
+              onClose={() => setSelected(null)}
+            />
+          </div>
+        ) : null}
+
+        {plan ? (
+          <div className="pointer-events-auto rounded-xl border bg-card/95 shadow-lg backdrop-blur">
+            <RouteStats plan={plan} />
+          </div>
+        ) : null}
+
+        {stats && !selected ? (
+          <div className="pointer-events-auto rounded-xl border bg-card/95 p-4 shadow-lg backdrop-blur">
+            <h3 className="mb-2 text-sm font-semibold">This campus after dark</h3>
+            <dl className="space-y-1.5 text-xs">
+              <Row label="Mapped" value={`${stats.totalKm} km`} />
+              <Row label="Unlit" value={`${stats.darkKm} km (${stats.darkPct}%)`} tone="amber" />
+              <Row
+                label="Busy AND dark"
+                value={`${stats.highRiskSegments} paths · ${stats.highRiskKm} km`}
+                tone="red"
+              />
+              {reports > 0 ? <Row label="Your reports" value={`${reports}`} tone="green" /> : null}
+            </dl>
+            <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+              Only the third row is a safety problem. The rest is unlit ground nobody walks.
+            </p>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="absolute right-3 top-3 z-[1000] flex gap-2 sm:right-4 sm:top-4">
+        <Button
+          size="sm"
+          variant={mode === 'report' ? 'default' : 'secondary'}
+          disabled={!ready}
+          onClick={() => toggleMode('report')}
+        >
+          <span className="hidden sm:inline">
+            {mode === 'report' ? 'Hover a path, then click' : 'Report a dark path'}
+          </span>
+          <span className="sm:hidden">{mode === 'report' ? 'Tap a path' : 'Report'}</span>
+          {reports > 0 ? ` (${reports})` : ''}
+        </Button>
+        <Button
+          size="sm"
+          variant={mode === 'inspect' ? 'default' : 'secondary'}
+          disabled={!ready}
+          onClick={() => toggleMode('inspect')}
+          title="Identify a path and copy its coordinates for docs/campus-data.json"
+        >
+          {mode === 'inspect' ? 'Tap a path' : 'Inspect'}
+        </Button>
+      </div>
+
+      <div className="absolute bottom-4 right-16 z-[1000] hidden flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-card/95 px-3 py-2 text-[11px] text-muted-foreground shadow-lg backdrop-blur sm:flex">
+        <Legend color={C.lit} label="lit" />
+        <Legend color={C.busyDark} label="dark & busy" />
+        <Legend color={C.moderate} label="dark, some traffic" />
+        <Legend color={C.quietDark} label="dark, quiet" />
+        {plan ? <Legend color={C.bulbCore} label="safer route" glow /> : null}
+        {plan ? <Legend color="#E8ECF4" label="shortest" dashed /> : null}
+      </div>
+
+      {!ready ? (
+        <div className="absolute inset-0 z-[1100] grid place-items-center bg-background/80 text-sm text-muted-foreground">
+          Loading the campus network…
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Row({ label, value, tone }: { label: string; value: string; tone?: 'amber' | 'red' | 'green' }) {
+  const color =
+    tone === 'red'
+      ? 'text-red-400'
+      : tone === 'amber'
+        ? 'text-amber-400'
+        : tone === 'green'
+          ? 'text-emerald-400'
+          : 'text-foreground';
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className={`font-medium tabular-nums ${color}`}>{value}</dd>
+    </div>
+  );
+}
+
+/** Hostels and destinations grouped, because that is how a student thinks about it. */
+function PlaceSelect({
+  places,
+  value,
+  onChange,
+}: {
+  places: Place[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const hostels = places.filter((p) => p.kind === 'hostel');
+  const dests = places.filter((p) => p.kind === 'dest');
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="mt-1 h-9 w-full rounded-md border bg-background px-2 text-sm text-foreground"
+    >
+      <optgroup label="Hostel blocks">
+        {hostels.map((p) => (
+          <option key={p.name} value={p.name}>
+            {p.name}
+          </option>
+        ))}
+      </optgroup>
+      <optgroup label="Campus destinations">
+        {dests.map((p) => (
+          <option key={p.name} value={p.name}>
+            {p.name}
+          </option>
+        ))}
+      </optgroup>
+    </select>
+  );
+}
+
+function Legend({
+  color,
+  label,
+  dashed,
+  glow,
+}: {
+  color: string;
+  label: string;
+  dashed?: boolean;
+  glow?: boolean;
+}) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span
+        className="inline-block h-0.5 w-4 rounded"
+        style={
+          dashed
+            ? { backgroundImage: `repeating-linear-gradient(90deg, ${color} 0 2px, transparent 2px 4px)` }
+            : { backgroundColor: color, boxShadow: glow ? `0 0 8px 2px ${C.bulbGlow}` : undefined }
+        }
+      />
+      {label}
+    </span>
+  );
+}
