@@ -17,6 +17,10 @@ The product idea lives in `docs/STATE.md` — read that for current goals and st
 - `web/src/lib/ai/provider.ts` — LLM config. The only file that imports a provider.
 - `web/src/app/api/chat/route.ts` — the agent loop endpoint.
 - `web/src/components/Chat.tsx` — chat UI, tool trace, approval buttons.
+- `web/src/components/layout/nav.ts` — sidebar links and app name. Edit to change nav.
+- `web/src/components/layout/AppShell.tsx` — page frame. Wrap every page in it.
+- `web/src/components/providers/notifications.tsx` — agent notification store.
+- `web/src/components/ui/` — shadcn components. Reuse these; do not hand-roll buttons.
 - `web/prisma/schema.prisma` — data model.
 - `docs/STATE.md` — what we are building and what is done. Update it as you go.
 
@@ -30,6 +34,14 @@ The product idea lives in `docs/STATE.md` — read that for current goals and st
   `schema.prisma`. Use the `PrismaPg` driver adapter.
 - **Tailwind v4.** Config is CSS-first in `globals.css`. There is no
   `tailwind.config.js` and you should not create one.
+- **shadcn/ui is built on Base UI here, NOT Radix.** There is no `asChild` prop.
+  Use `render={<Button />}` instead:
+  `<DropdownMenuTrigger render={<Button variant="ghost" />}>...</DropdownMenuTrigger>`
+- **Colors come from theme tokens**, never hardcoded. Use `bg-background`,
+  `text-muted-foreground`, `bg-card`, `border`, `var(--chart-1..5)`. Do not write
+  `bg-white dark:bg-neutral-900` — the tokens already handle dark mode.
+- **Every page must be wrapped in `<AppShell title="...">`** or it renders with
+  no navigation.
 - Do not downgrade any of these to match an older tutorial. Fix forward.
 
 ## Conventions
@@ -37,6 +49,9 @@ The product idea lives in `docs/STATE.md` — read that for current goals and st
 - Every new agent capability is a tool in `tools.ts`, not a bespoke API route.
 - Tool `description` fields are prompt engineering. Write them carefully.
 - Keep components under ~150 lines; split when they grow.
+- Add new shadcn components with `npx shadcn@latest add <name> --yes`.
+- New route at `/foo` requires `src/app/foo/page.tsx` to exist before any
+  `<Link href="/foo">` will typecheck — routes are typed in Next 16.
 
 ## Verify before claiming done
 ```

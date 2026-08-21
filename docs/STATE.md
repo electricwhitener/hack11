@@ -13,6 +13,8 @@ Nothing yet — waiting for the problem statement.
 
 ## Done
 - Scaffold ready: Next.js 16 + AI SDK v7 + Gemini, FastAPI sidecar, verified building.
+- UI foundation: shadcn/ui (15 components), AppShell with sidebar + mobile sheet,
+  dark mode, notification bell + toast store. Build verified, routes render.
 
 ## Decisions
 | Decision | Reason |
@@ -20,6 +22,8 @@ Nothing yet — waiting for the problem statement.
 | Gemini free tier via AI SDK | No card needed, generous quota, one-file provider swap. |
 | Agent tools over bespoke API routes | Every capability becomes something the agent can invoke and the judge can see. |
 | Python kept in a separate service | Lets one teammate work on analysis without touching the frontend. |
+| shadcn/ui on Base UI | Came with the CLI. Note: `render=` not `asChild`. |
+| Notification store built pre-emptively | Enables the proactive-agent pattern, the top differentiator. |
 
 ## Blocked / Known broken
 None.
@@ -37,3 +41,4 @@ you which features actually matter and which are decoration._
 
 ## Progress log
 - Pre-hackathon: scaffold built and verified.
+- Pre-hackathon: UI foundation (component kit, app shell, notifications) added and verified.

@@ -11,13 +11,14 @@ export type ChartSpec = {
   data: { label: string; value: number }[];
 };
 
-const COLORS = ['#6366f1', '#14b8a6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+// Uses the theme's chart tokens so charts match light and dark automatically.
+const COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
 
 /** Renders a chart the agent asked for. This is "generative UI": the model
  *  returns structured data and the app decides how it looks. */
 export function Chart({ spec }: { spec: ChartSpec }) {
   return (
-    <div className="my-3 rounded-xl border border-black/10 bg-white p-4 dark:border-white/15 dark:bg-neutral-900">
+    <div className="my-3 rounded-xl border bg-card p-4">
       <h4 className="mb-3 text-sm font-semibold">{spec.title}</h4>
       <div className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">

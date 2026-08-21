@@ -3,10 +3,14 @@
 import { useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Chart, type ChartSpec } from './Chart';
+import { useNotifications } from '@/components/providers/notifications';
 
 export function Chat() {
   const [input, setInput] = useState('');
+  const { push } = useNotifications();
   const { messages, sendMessage, status, addToolApprovalResponse, error } = useChat({
     transport: new DefaultChatTransport({ api: '/api/chat' }),
   });
@@ -14,18 +18,36 @@ export function Chat() {
   const busy = status === 'submitted' || status === 'streaming';
 
   return (
-    <div className="mx-auto flex h-dvh max-w-3xl flex-col">
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
+    <div className="mx-auto flex h-full max-w-3xl flex-col">
+      <div className="flex-1 space-y-5 overflow-y-auto p-4">
         {messages.length === 0 && (
-          <p className="mt-20 text-center text-sm text-neutral-500">
-            Ask the agent something. It can chart data, run analyses, and request
-            your approval before acting.
-          </p>
+          <div className="mt-24 text-center">
+            <p className="text-sm text-muted-foreground">
+              Ask the agent something. It can chart data, run analyses, and request
+              your approval before acting.
+            </p>
+            {/* Demo trigger for the proactive-notification pattern. Delete once
+                a real event source pushes notifications. */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={() =>
+                push({
+                  title: 'Agent noticed something',
+                  body: 'This is how a proactive alert appears. Check the bell.',
+                  kind: 'warning',
+                })
+              }
+            >
+              Try a proactive alert
+            </Button>
+          </div>
         )}
 
         {messages.map((m) => (
           <div key={m.id} className="space-y-2">
-            <div className="text-xs font-medium uppercase tracking-wide text-neutral-400">
+            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {m.role === 'user' ? 'You' : 'Agent'}
             </div>
 
@@ -40,11 +62,9 @@ export function Chat() {
 
               if (part.type === 'reasoning') {
                 return (
-                  <details key={i} className="rounded-lg bg-neutral-100 p-2 text-xs dark:bg-neutral-800">
-                    <summary className="cursor-pointer text-neutral-500">Reasoning</summary>
-                    <p className="mt-1 whitespace-pre-wrap text-neutral-600 dark:text-neutral-400">
-                      {part.text}
-                    </p>
+                  <details key={i} className="rounded-lg bg-muted p-2 text-xs">
+                    <summary className="cursor-pointer text-muted-foreground">Reasoning</summary>
+                    <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{part.text}</p>
                   </details>
                 );
               }
@@ -58,23 +78,28 @@ export function Chat() {
                   return (
                     <div
                       key={i}
-                      className="rounded-xl border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950"
+                      className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3"
                     >
                       <p className="text-sm font-medium">Approve this action?</p>
-                      <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">{summary}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{summary}</p>
                       <div className="mt-3 flex gap-2">
-                        <button
-                          onClick={() => addToolApprovalResponse({ id: part.approval.id, approved: true })}
-                          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            addToolApprovalResponse({ id: part.approval.id, approved: true })
+                          }
                         >
                           Approve
-                        </button>
-                        <button
-                          onClick={() => addToolApprovalResponse({ id: part.approval.id, approved: false })}
-                          className="rounded-lg bg-neutral-200 px-3 py-1.5 text-sm font-medium hover:bg-neutral-300 dark:bg-neutral-700"
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() =>
+                            addToolApprovalResponse({ id: part.approval.id, approved: false })
+                          }
                         >
                           Deny
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   );
@@ -88,12 +113,9 @@ export function Chat() {
                 // Everything else renders as a visible trace step. Judges love
                 // seeing the agent's work instead of a black box.
                 return (
-                  <div
-                    key={i}
-                    className="rounded-lg border border-black/10 bg-neutral-50 px-3 py-2 text-xs dark:border-white/10 dark:bg-neutral-900"
-                  >
+                  <div key={i} className="rounded-lg border bg-card px-3 py-2 text-xs">
                     <span className="font-mono font-medium">{name}</span>
-                    <span className="ml-2 text-neutral-500">
+                    <span className="ml-2 text-muted-foreground">
                       {part.state === 'output-available'
                         ? 'done'
                         : part.state === 'output-error'
@@ -103,7 +125,7 @@ export function Chat() {
                             : 'running…'}
                     </span>
                     {part.state === 'output-available' && (
-                      <pre className="mt-1 max-h-40 overflow-auto text-[11px] text-neutral-500">
+                      <pre className="mt-1 max-h-40 overflow-auto text-[11px] text-muted-foreground">
                         {JSON.stringify(part.output, null, 2)}
                       </pre>
                     )}
@@ -117,7 +139,7 @@ export function Chat() {
         ))}
 
         {error && (
-          <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
+          <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm">
             {error.message}
           </p>
         )}
@@ -130,21 +152,16 @@ export function Chat() {
           sendMessage({ text: input });
           setInput('');
         }}
-        className="flex gap-2 border-t border-black/10 p-4 dark:border-white/10"
+        className="flex shrink-0 gap-2 border-t p-4"
       >
-        <input
+        <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask the agent…"
-          className="flex-1 rounded-xl border border-black/15 px-4 py-2.5 outline-none focus:border-indigo-500 dark:border-white/20 dark:bg-neutral-900"
         />
-        <button
-          type="submit"
-          disabled={busy}
-          className="rounded-xl bg-indigo-600 px-5 py-2.5 font-medium text-white disabled:opacity-40"
-        >
+        <Button type="submit" disabled={busy}>
           {busy ? '…' : 'Send'}
-        </button>
+        </Button>
       </form>
     </div>
   );
