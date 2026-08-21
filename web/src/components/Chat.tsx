@@ -9,8 +9,17 @@ import { Loader2, Check, X, RotateCcw } from 'lucide-react';
 import { Chart, type ChartSpec } from './Chart';
 import { AgentStatus } from './agent/AgentStatus';
 import { toolLabel } from './agent/toolLabels';
-import { loadMessages, saveMessages, clearMessages } from '@/lib/chatStorage';
+import {
+  listSessions,
+  loadSession,
+  saveSession,
+  deleteSession,
+  getActiveSessionId,
+  setActiveSessionId,
+  type ChatSession,
+} from '@/lib/chatStorage';
 import { useNotifications } from '@/components/providers/notifications';
+import { ChatHistory } from './agent/ChatHistory';
 
 export function Chat() {
   const [input, setInput] = useState('');
@@ -27,26 +36,86 @@ export function Chat() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, status]);
 
-  // Restore history AFTER mount, never during render: localStorage does not
-  // exist on the server, and seeding initial state from it causes a hydration
-  // mismatch. A one-frame empty flash is the correct trade.
+  // The conversation currently open, so a brand-new chat has an id before its
+  // first message ever saves. Safe to generate during SSR too: the id is never
+  // rendered as text on first paint (sessions starts empty), only used for
+  // storage keys and equality checks once the effect below restores state.
+  const [sessionId, setSessionIdState] = useState<string>(() => crypto.randomUUID());
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+
+  // Restore the last-open conversation AFTER mount, never during render:
+  // localStorage does not exist on the server, and seeding initial state from
+  // it causes a hydration mismatch. A one-frame empty flash is the correct
+  // trade.
   const restored = useRef(false);
   useEffect(() => {
     if (restored.current) return;
     restored.current = true;
-    const saved = loadMessages();
-    if (saved.length) setMessages(saved);
+
+    setSessions(listSessions());
+
+    const lastId = getActiveSessionId();
+    const saved = lastId ? loadSession(lastId) : null;
+    if (saved) {
+      setSessionIdState(saved.id);
+      setMessages(saved.messages);
+    }
   }, [setMessages]);
 
   // Persist once a turn settles. Writing mid-stream would save half-formed
   // messages and thrash localStorage on every token.
   useEffect(() => {
-    if (!restored.current || status !== 'ready') return;
-    if (messages.length) saveMessages(messages);
-  }, [messages, status]);
+    if (!restored.current || status !== 'ready' || !sessionId) return;
+    if (!messages.length) return;
+    saveSession(sessionId, messages);
+    setActiveSessionId(sessionId);
+    setSessions(listSessions());
+  }, [messages, status, sessionId]);
+
+  function startNewChat() {
+    setSessionIdState(crypto.randomUUID());
+    setMessages([]);
+  }
+
+  function selectSession(id: string) {
+    const s = loadSession(id);
+    if (!s) return;
+    setSessionIdState(id);
+    setActiveSessionId(id);
+    setMessages(s.messages);
+  }
+
+  function removeSession(id: string) {
+    deleteSession(id);
+    setSessions(listSessions());
+    if (id === sessionId) startNewChat();
+  }
 
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col">
+      <div className="flex shrink-0 items-center gap-1 border-b px-2 py-1.5">
+        <ChatHistory
+          sessions={sessions}
+          activeId={sessionId}
+          onSelect={selectSession}
+          onDelete={removeSession}
+        />
+        <span className="truncate text-xs text-muted-foreground">
+          {sessions.find((s) => s.id === sessionId)?.title ?? 'New chat'}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="ml-auto"
+          aria-label="New chat"
+          title="New chat"
+          disabled={busy || messages.length === 0}
+          onClick={startNewChat}
+        >
+          <RotateCcw className="size-4" />
+        </Button>
+      </div>
+
       <div className="flex-1 space-y-5 overflow-y-auto p-4">
         {messages.length === 0 && (
           <div className="mt-24 text-center">
@@ -217,22 +286,6 @@ export function Chat() {
         <Button type="submit" disabled={busy}>
           {busy ? '…' : 'Send'}
         </Button>
-        {messages.length > 0 && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="New chat"
-            title="New chat"
-            disabled={busy}
-            onClick={() => {
-              clearMessages();
-              setMessages([]);
-            }}
-          >
-            <RotateCcw className="size-4" />
-          </Button>
-        )}
       </form>
     </div>
   );
