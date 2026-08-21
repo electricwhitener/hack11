@@ -23,7 +23,25 @@ Priority: the map is built first because its screenshots are what the PPT needs.
 PPT must be finished by 05:30 regardless of demo state.
 
 ## Now
-**Working demo + deck both exist.** Remaining: screenshots into the deck, then polish.
+**DEPLOYED at 05:10 to https://sweetjalapenos.vercel.app** — verified in
+production, not just locally: `/api/graph` 1,883 segments, `/api/route-plan`
+99% cut for +1 m, `/api/inspect` 48 m span, `/queue` 200.
+
+Remaining: screenshot into `docs/shots/map.png`, then regenerate the deck
+(`npx tsx scripts/facts.ts` then `python build_deck.py`) — its numbers still
+predate the belief model and the 50 m cap.
+
+## Login: Google account cannot sign in with a password
+Not a password bug. **Supabase stores no password for an OAuth signup**, so
+`signInWithPassword` on a Google-created account can never match — the Google
+password belongs to Google. The fallback `signUp` then reports "already
+registered", which read as "wrong password" and stranded people.
+
+Supabase deliberately will not tell the client which case it is (that would
+allow account enumeration), so the login page now names both causes and leads
+with the Google one. A real fix would be a password-reset flow, deliberately
+NOT added: it sends email, and the free tier throttles outbound mail to a few
+per hour — it would fail silently mid-demo.
 
 ## Progress
 - Verified against live OSM: Chandigarh has **0** mapped street lamps and only
