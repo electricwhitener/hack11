@@ -511,7 +511,7 @@ export function DarkZoneMap() {
         </div>
 
         {selected ? (
-          <div className="pointer-events-auto">
+          <div className="panel-in pointer-events-auto">
             <PathInspector
               info={selected}
               mode={mode}
@@ -522,13 +522,13 @@ export function DarkZoneMap() {
         ) : null}
 
         {plan ? (
-          <div className="pointer-events-auto rounded-xl border bg-card/95 shadow-lg backdrop-blur">
+          <div className="panel-in pointer-events-auto rounded-xl border bg-card/95 shadow-lg backdrop-blur">
             <RouteStats plan={plan} />
           </div>
         ) : null}
 
         {stats && !selected ? (
-          <div className="pointer-events-auto rounded-xl border bg-card/95 p-4 shadow-lg backdrop-blur">
+          <div className="panel-in pointer-events-auto rounded-xl border bg-card/95 p-4 shadow-lg backdrop-blur">
             <h3 className="mb-2 text-sm font-semibold">This campus after dark</h3>
             <dl className="space-y-1.5 text-xs">
               <Row label="Mapped" value={`${stats.totalKm} km`} />
