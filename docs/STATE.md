@@ -7,7 +7,8 @@
 _One paragraph: what we are building and for whom. Fill in at kickoff._
 
 ## Now
-Nothing yet — waiting for the problem statement.
+Setup phase complete. Deployed and live at https://sweetjalapenos.vercel.app/
+(agent verified responding with real Gemini in production).
 
 **Next step:** run `/kickoff <problem statement>` when it drops.
 
@@ -26,6 +27,8 @@ Nothing yet — waiting for the problem statement.
 | Notification store built pre-emptively | Enables the proactive-agent pattern, the top differentiator. |
 | Prisma client committed to git | Vercel's npm blocks dependency install scripts, so `prisma generate` cannot run there. Regenerate locally via `npm run db:generate`. |
 | Gemini rolling aliases (`gemini-flash-latest`) | A pinned dated model was deprecated mid-setup; aliases track current stable. |
+| No LangGraph | AI SDK v7 already covers tool loops and human-in-loop approval. A second orchestration framework costs hours and wins no marks. |
+| LLM interprets, never computes | Ground truth comes from `py-service`; the model explains it. This is what stops demo hallucination. |
 
 ## Blocked / Known broken
 None.
@@ -45,3 +48,4 @@ you which features actually matter and which are decoration._
 - Pre-hackathon: scaffold built and verified.
 - Pre-hackathon: UI foundation (component kit, app shell, notifications) added and verified.
 - Pre-hackathon: deployed to Vercel. Fixed model deprecation + Prisma/Vercel build failure.
+- Pre-hackathon: live agent status line (shimmer + per-tool verbs) and richer tool trace.
