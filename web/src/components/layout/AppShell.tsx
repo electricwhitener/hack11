@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/s
 import { NAV, APP_NAME } from './nav';
 import { NotificationBell } from './NotificationBell';
 import { ThemeToggle } from './ThemeToggle';
+import { UserMenu } from './UserMenu';
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -75,6 +76,7 @@ export function AppShell({ title, children }: { title?: string; children: React.
           <div className="ml-auto flex items-center gap-1">
             <NotificationBell />
             <ThemeToggle />
+            <UserMenu />
           </div>
         </header>
 

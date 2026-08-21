@@ -10,19 +10,19 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import type { ChatSession } from '@/lib/chatStorage';
+import type { ChatSummary } from '@/lib/chatStorage';
 
 /**
  * Past-conversation switcher. "New chat" starts a fresh thread WITHOUT
  * deleting the current one — this panel is how you get back to it.
  */
 export function ChatHistory({
-  sessions,
+  chats,
   activeId,
   onSelect,
   onDelete,
 }: {
-  sessions: ChatSession[];
+  chats: ChatSummary[];
   activeId: string | null;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
@@ -38,32 +38,32 @@ export function ChatHistory({
           <SheetTitle className="text-sm">Past conversations</SheetTitle>
         </SheetHeader>
 
-        {sessions.length === 0 ? (
+        {chats.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-muted-foreground">
             Nothing saved yet. Conversations appear here once you send a message.
           </p>
         ) : (
           <ScrollArea className="h-[calc(100dvh-3.5rem)]">
             <ul className="divide-y">
-              {sessions.map((s) => (
-                <li key={s.id} className="group relative">
+              {chats.map((c) => (
+                <li key={c.id} className="group relative">
                   <button
-                    onClick={() => onSelect(s.id)}
+                    onClick={() => onSelect(c.id)}
                     className={`w-full px-4 py-3 text-left transition-colors hover:bg-accent ${
-                      s.id === activeId ? 'bg-accent' : ''
+                      c.id === activeId ? 'bg-accent' : ''
                     }`}
                   >
-                    <p className="truncate pr-7 text-sm font-medium">{s.title}</p>
+                    <p className="truncate pr-7 text-sm font-medium">{c.title}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {relativeTime(s.updatedAt)}
+                      {relativeTime(c.updated_at)}
                     </p>
                   </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onDelete(s.id);
+                      onDelete(c.id);
                     }}
-                    aria-label={`Delete "${s.title}"`}
+                    aria-label={`Delete "${c.title}"`}
                     className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground opacity-0 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
                   >
                     <Trash2 className="size-3.5" />
@@ -78,8 +78,8 @@ export function ChatHistory({
   );
 }
 
-function relativeTime(ts: number): string {
-  const seconds = Math.floor((Date.now() - ts) / 1000);
+function relativeTime(iso: string): string {
+  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (seconds < 60) return 'just now';
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m ago`;

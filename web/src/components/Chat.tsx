@@ -10,13 +10,13 @@ import { Chart, type ChartSpec } from './Chart';
 import { AgentStatus } from './agent/AgentStatus';
 import { toolLabel } from './agent/toolLabels';
 import {
-  listSessions,
-  loadSession,
-  saveSession,
-  deleteSession,
-  getActiveSessionId,
-  setActiveSessionId,
-  type ChatSession,
+  listChats,
+  loadChat,
+  createChat,
+  saveChat,
+  deleteChat,
+  titleFrom,
+  type ChatSummary,
 } from '@/lib/chatStorage';
 import { useNotifications } from '@/components/providers/notifications';
 import { ChatHistory } from './agent/ChatHistory';
@@ -36,72 +36,75 @@ export function Chat() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, status]);
 
-  // The conversation currently open, so a brand-new chat has an id before its
-  // first message ever saves. Safe to generate during SSR too: the id is never
-  // rendered as text on first paint (sessions starts empty), only used for
-  // storage keys and equality checks once the effect below restores state.
-  const [sessionId, setSessionIdState] = useState<string>(() => crypto.randomUUID());
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  // null until the first message is sent — a conversation row is only created
+  // when there is something to put in it, so empty chats never clutter the list.
+  const [chatId, setChatId] = useState<string | null>(null);
+  const [chats, setChats] = useState<ChatSummary[]>([]);
 
-  // Restore the last-open conversation AFTER mount, never during render:
-  // localStorage does not exist on the server, and seeding initial state from
-  // it causes a hydration mismatch. A one-frame empty flash is the correct
-  // trade.
-  const restored = useRef(false);
+  async function refreshChats() {
+    setChats(await listChats());
+  }
+
+  // Load the conversation list on mount. Deliberately does NOT auto-open the
+  // most recent one: landing in a half-remembered conversation is disorienting,
+  // and the history panel is one click away.
   useEffect(() => {
-    if (restored.current) return;
-    restored.current = true;
-
-    setSessions(listSessions());
-
-    const lastId = getActiveSessionId();
-    const saved = lastId ? loadSession(lastId) : null;
-    if (saved) {
-      setSessionIdState(saved.id);
-      setMessages(saved.messages);
-    }
-  }, [setMessages]);
+    void refreshChats();
+  }, []);
 
   // Persist once a turn settles. Writing mid-stream would save half-formed
-  // messages and thrash localStorage on every token.
+  // messages on every token.
+  const saving = useRef(false);
   useEffect(() => {
-    if (!restored.current || status !== 'ready' || !sessionId) return;
-    if (!messages.length) return;
-    saveSession(sessionId, messages);
-    setActiveSessionId(sessionId);
-    setSessions(listSessions());
-  }, [messages, status, sessionId]);
+    if (status !== 'ready' || !messages.length || saving.current) return;
+
+    saving.current = true;
+    void (async () => {
+      try {
+        let id = chatId;
+        if (!id) {
+          const created = await createChat(titleFrom(messages));
+          if (!created) return;
+          id = created.id;
+          setChatId(id);
+        }
+        await saveChat(id, messages, titleFrom(messages));
+        await refreshChats();
+      } finally {
+        saving.current = false;
+      }
+    })();
+  }, [messages, status, chatId]);
 
   function startNewChat() {
-    setSessionIdState(crypto.randomUUID());
+    setChatId(null);
     setMessages([]);
   }
 
-  function selectSession(id: string) {
-    const s = loadSession(id);
-    if (!s) return;
-    setSessionIdState(id);
-    setActiveSessionId(id);
-    setMessages(s.messages);
+  async function selectChat(id: string) {
+    const loaded = await loadChat(id);
+    if (!loaded) return;
+    setChatId(id);
+    setMessages(loaded.messages);
   }
 
-  function removeSession(id: string) {
-    deleteSession(id);
-    setSessions(listSessions());
-    if (id === sessionId) startNewChat();
+  async function removeChat(id: string) {
+    await deleteChat(id);
+    await refreshChats();
+    if (id === chatId) startNewChat();
   }
 
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col">
       <div className="flex shrink-0 items-center gap-1 border-b px-2 py-1.5">
         <ChatHistory
-          sessions={sessions}
-          activeId={sessionId}
-          onSelect={selectSession}
-          onDelete={removeSession}
+          chats={chats}
+          activeId={chatId}
+          onSelect={selectChat}
+          onDelete={removeChat}
         />
         <span className="truncate text-xs text-muted-foreground">
-          {sessions.find((s) => s.id === sessionId)?.title ?? 'New chat'}
+          {chats.find((c) => c.id === chatId)?.title ?? 'New chat'}
         </span>
         <Button
           variant="ghost"
