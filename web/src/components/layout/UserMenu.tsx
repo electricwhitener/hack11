@@ -1,14 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -17,7 +15,6 @@ import { hasSupabase } from '@/lib/supabase/config';
 
 /** Signed-in user's initial, with a sign-out action. */
 export function UserMenu() {
-  const router = useRouter();
   const supabase = createClient();
   const [email, setEmail] = useState<string | null>(null);
 
@@ -39,15 +36,18 @@ export function UserMenu() {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="truncate text-xs font-normal text-muted-foreground">
-          {email}
-        </DropdownMenuLabel>
+        {/* A plain div, NOT DropdownMenuLabel: that maps to Base UI's
+            GroupLabel, which throws "MenuGroupContext is missing" unless it is
+            wrapped in a <Menu.Group>. The thrown error takes down the whole
+            page, not just the menu. */}
+        <div className="truncate px-2 py-1.5 text-xs text-muted-foreground">{email}</div>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={async () => {
             await supabase.auth.signOut();
-            router.push('/login');
-            router.refresh();
+            // Full page load so the server re-reads the now-cleared session
+            // cookie; a client transition can render a stale signed-in view.
+            window.location.assign('/login');
           }}
         >
           <LogOut className="size-4" />

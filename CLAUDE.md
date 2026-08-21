@@ -42,6 +42,9 @@ The product idea lives in `docs/STATE.md` — read that for current goals and st
 - **shadcn/ui is built on Base UI here, NOT Radix.** There is no `asChild` prop.
   Use `render={<Button />}` instead:
   `<DropdownMenuTrigger render={<Button variant="ghost" />}>...</DropdownMenuTrigger>`
+- **`DropdownMenuLabel` THROWS unless wrapped in a Base UI `<Menu.Group>`**
+  ("MenuGroupContext is missing"), and the throw takes down the whole page, not
+  just the menu. For a plain non-interactive line in a menu, use a `<div>`.
 - **Colors come from theme tokens**, never hardcoded. Use `bg-background`,
   `text-muted-foreground`, `bg-card`, `border`, `var(--chart-1..5)`. Do not write
   `bg-white dark:bg-neutral-900` — the tokens already handle dark mode.
