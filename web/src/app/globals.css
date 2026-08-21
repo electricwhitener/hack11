@@ -128,3 +128,12 @@
     @apply font-sans;
   }
 }
+/* Shimmer used by the agent status line. */
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@theme inline {
+  --animate-shimmer: shimmer 2s linear infinite;
+}

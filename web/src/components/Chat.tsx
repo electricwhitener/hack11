@@ -5,7 +5,10 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Loader2, Check, X } from 'lucide-react';
 import { Chart, type ChartSpec } from './Chart';
+import { AgentStatus } from './agent/AgentStatus';
+import { toolLabel } from './agent/toolLabels';
 import { useNotifications } from '@/components/providers/notifications';
 
 export function Chat() {
@@ -112,22 +115,38 @@ export function Chat() {
 
                 // Everything else renders as a visible trace step. Judges love
                 // seeing the agent's work instead of a black box.
+                const running =
+                  part.state === 'input-streaming' || part.state === 'input-available';
+
                 return (
                   <div key={i} className="rounded-lg border bg-card px-3 py-2 text-xs">
-                    <span className="font-mono font-medium">{name}</span>
-                    <span className="ml-2 text-muted-foreground">
-                      {part.state === 'output-available'
-                        ? 'done'
-                        : part.state === 'output-error'
-                          ? `error: ${part.errorText}`
-                          : part.state === 'output-denied'
-                            ? 'denied by user'
-                            : 'running…'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {running ? (
+                        <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+                      ) : part.state === 'output-available' ? (
+                        <Check className="size-3.5 shrink-0 text-emerald-500" />
+                      ) : (
+                        <X className="size-3.5 shrink-0 text-destructive" />
+                      )}
+                      <span className="font-medium">
+                        {toolLabel(name, part.state === 'output-available' ? 'done' : 'running')}
+                      </span>
+                      {part.state === 'output-error' && (
+                        <span className="text-destructive">{part.errorText}</span>
+                      )}
+                      {part.state === 'output-denied' && (
+                        <span className="text-muted-foreground">denied by you</span>
+                      )}
+                    </div>
                     {part.state === 'output-available' && (
-                      <pre className="mt-1 max-h-40 overflow-auto text-[11px] text-muted-foreground">
-                        {JSON.stringify(part.output, null, 2)}
-                      </pre>
+                      <details className="mt-1.5">
+                        <summary className="cursor-pointer text-muted-foreground">
+                          View result
+                        </summary>
+                        <pre className="mt-1 max-h-40 overflow-auto text-[11px] text-muted-foreground">
+                          {JSON.stringify(part.output, null, 2)}
+                        </pre>
+                      </details>
                     )}
                   </div>
                 );
@@ -137,6 +156,8 @@ export function Chat() {
             })}
           </div>
         ))}
+
+        <AgentStatus status={status} lastMessage={messages[messages.length - 1]} />
 
         {error && (
           <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm">
