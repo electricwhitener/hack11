@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { createClient } from '@/lib/supabase/client';
@@ -16,7 +15,6 @@ import { APP_NAME } from '@/components/layout/nav';
  * blocks the OAuth redirect — also no email, because confirmation is disabled.
  */
 export default function LoginPage() {
-  const router = useRouter();
   const supabase = createClient();
 
   const [email, setEmail] = useState('');
@@ -24,6 +22,31 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  /**
+   * Re-enable the form whenever this page becomes visible again.
+   *
+   * Starting the Google redirect sets busy=true and deliberately leaves it set,
+   * because the browser is navigating away. But if the user comes BACK — hits
+   * cancel, an OAuth error, or the back button — busy was never cleared and
+   * EVERY control stayed disabled, including the email form. That looked like
+   * "email login is broken" when the form simply could not be submitted.
+   *
+   * `pageshow` covers the back-button/bfcache restore that a plain mount
+   * effect misses.
+   */
+  useEffect(() => {
+    const reenable = () => setBusy(false);
+    reenable();
+    window.addEventListener('pageshow', reenable);
+    return () => window.removeEventListener('pageshow', reenable);
+  }, []);
+
+  // Surface the reason when /auth/callback bounced the user back here.
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get('error');
+    if (reason) setError(reason);
+  }, []);
 
   async function signInWithGoogle() {
     setBusy(true);
@@ -35,8 +58,11 @@ export default function LoginPage() {
     if (error) {
       setError(error.message);
       setBusy(false);
+      return;
     }
-    // On success the browser navigates to Google; no need to unset busy.
+    // If the redirect has not happened within a few seconds something blocked
+    // it (popup blocker, offline). Do not strand the user on a dead button.
+    setTimeout(() => setBusy(false), 5000);
   }
 
   async function signInWithPassword(e: React.FormEvent) {
@@ -45,34 +71,46 @@ export default function LoginPage() {
     setError(null);
     setNotice(null);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
 
-    if (error) {
-      // No account yet? Create one. Saves a separate signup screen, which is
-      // one less thing to click through in a demo.
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-      });
+      if (error) {
+        // No account yet? Create one. Saves a separate signup screen, which is
+        // one less thing to click through in a demo.
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        });
 
-      if (signUpError) {
-        setError(signUpError.message);
-        setBusy(false);
-        return;
+        if (signUpError) {
+          // Wrong password on an existing account reports as "already
+          // registered", which is confusing. Say what actually happened.
+          setError(
+            /already registered/i.test(signUpError.message)
+              ? 'That email already has an account, but the password is wrong.'
+              : signUpError.message,
+          );
+          setBusy(false);
+          return;
+        }
+
+        if (!signUpData.session) {
+          // Only happens if email confirmation is still switched on in Supabase.
+          setNotice('Account created. Check your email to confirm, then sign in.');
+          setBusy(false);
+          return;
+        }
       }
 
-      const { error: retry } = await supabase.auth.signInWithPassword({ email, password });
-      if (retry) {
-        // Only happens if email confirmation is still switched on in Supabase.
-        setNotice('Account created. Check your email to confirm, then sign in.');
-        setBusy(false);
-        return;
-      }
+      // Full page load, not router.push: the server needs to read the session
+      // cookie that was just written, and a client-side transition can render
+      // from a cached payload that still believes you are signed out.
+      window.location.assign('/');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not sign in. Please try again.');
+      setBusy(false);
     }
-
-    router.push('/');
-    router.refresh();
   }
 
   return (
