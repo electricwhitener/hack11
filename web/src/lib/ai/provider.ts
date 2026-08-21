@@ -13,8 +13,10 @@ export const hasLLMKey = Boolean(apiKey && apiKey.length > 10);
 
 const google = createGoogleGenerativeAI({ apiKey: apiKey ?? 'not-configured' });
 
-export const MODEL_ID = process.env.MODEL_ID ?? 'gemini-2.5-flash';
-export const FAST_MODEL_ID = process.env.FAST_MODEL_ID ?? 'gemini-2.5-flash-lite';
+// Rolling aliases: Google repoints these at the current stable model, so pinning
+// a dated version (e.g. gemini-2.5-flash) can't quietly go stale mid-hackathon.
+export const MODEL_ID = process.env.MODEL_ID ?? 'gemini-flash-latest';
+export const FAST_MODEL_ID = process.env.FAST_MODEL_ID ?? 'gemini-flash-lite-latest';
 
 /** Main reasoning + tool-calling model. */
 export const chatModel = () => google(MODEL_ID);
