@@ -15,9 +15,13 @@ import uuid
 from typing import Any
 
 import pandas as pd
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+# A judge WILL upload something blank or wrong-format at some point. Verified:
+# an empty file crashes pandas with an unhandled 500 unless caught explicitly.
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25MB is generous for a hackathon CSV.
 
 app = FastAPI(title="Analysis Service")
 
@@ -40,9 +44,30 @@ def health() -> dict[str, str]:
 
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)) -> dict[str, Any]:
-    """Accept a CSV and return a handle plus an immediate profile."""
+    """Accept a CSV and return a handle plus an immediate profile.
+
+    Never lets a bad upload reach an unhandled exception -> raw 500. A judge
+    poking at the app is far more likely to hit "wrong file" than "too big".
+    """
     raw = await file.read()
-    df = pd.read_csv(io.BytesIO(raw))
+
+    if len(raw) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, f"File too large. Max {MAX_UPLOAD_BYTES // (1024 * 1024)}MB.")
+    if not raw.strip():
+        raise HTTPException(400, "That file is empty.")
+
+    try:
+        df = pd.read_csv(io.BytesIO(raw))
+    except pd.errors.EmptyDataError:
+        raise HTTPException(400, "That file has no columns to parse — is it a valid CSV?")
+    except pd.errors.ParserError as e:
+        raise HTTPException(400, f"Could not parse this as a CSV: {e}")
+    except UnicodeDecodeError:
+        raise HTTPException(400, "Could not read this file's encoding. Please upload UTF-8 text.")
+
+    if df.empty or len(df.columns) == 0:
+        raise HTTPException(400, "That file has no usable rows or columns.")
+
     dataset_id = str(uuid.uuid4())[:8]
     DATASETS[dataset_id] = df
     return {
