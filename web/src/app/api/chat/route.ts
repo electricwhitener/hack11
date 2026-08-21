@@ -6,7 +6,7 @@ import {
   createUIMessageStreamResponse,
   type UIMessage,
 } from 'ai';
-import { hasLLMKey, modelById, MODEL_CHAIN, googleOptions } from '@/lib/ai/provider';
+import { hasLLMKey, modelFor, MODEL_ATTEMPTS, googleOptions } from '@/lib/ai/provider';
 import { tools } from '@/lib/ai/tools';
 import { SYSTEM_PROMPT } from '@/lib/ai/prompt';
 
@@ -24,9 +24,10 @@ export async function POST(req: Request) {
     execute: async ({ writer }) => {
       let lastError: unknown;
 
-      // Walk the chain. Google's free quota is per model per day, so an
-      // exhausted model is normal, not exceptional — move to the next one.
-      for (const id of MODEL_CHAIN) {
+      // Walk every (key, model) pair. Google's free quota is per project per
+      // model per day, so an exhausted combination is normal, not exceptional
+      // — move to the next one.
+      for (const attempt of MODEL_ATTEMPTS) {
         // streamText's own onError receives the REAL provider error. The promise
         // below rejects with a bare "No output generated" and no `cause`, so this
         // callback is the only place the 429 is actually visible.
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
             onError: ({ error }) => {
               providerError = error;
             },
-            model: modelById(id),
+            model: modelFor(attempt),
             system: SYSTEM_PROMPT,
             messages: modelMessages,
             tools,
@@ -93,9 +94,15 @@ function errorText(error: unknown, depth = 0): string {
   return String(error);
 }
 
-/** Quota and availability failures are worth trying the next model for. */
+/**
+ * Worth trying the next (key, model) attempt for. This includes auth failures
+ * (401/403/PERMISSION_DENIED) alongside quota and availability errors — a
+ * revoked or mistyped key on attempt N must not block attempt N+1, which may
+ * use a completely different key. Verified: without 401/403 here, one bad key
+ * placed first in the chain silently kills every attempt after it.
+ */
 function isRetryableModelError(error: unknown): boolean {
-  return /quota|rate.?limit|RESOURCE_EXHAUSTED|429|not found|404|unavailable|overloaded|503/i.test(
+  return /quota|rate.?limit|RESOURCE_EXHAUSTED|429|not found|404|unavailable|overloaded|503|401|403|PERMISSION_DENIED|API key/i.test(
     errorText(error),
   );
 }
@@ -108,7 +115,7 @@ function friendlyError(error: unknown): string {
   const raw = errorText(error);
 
   if (/quota|rate.?limit|RESOURCE_EXHAUSTED|429/i.test(raw)) {
-    return 'Every available model has hit its free daily quota. Add another API key or wait for the quota to reset.';
+    return 'Every available model and key has hit its free daily quota. Add another API key (GOOGLE_GENERATIVE_AI_API_KEYS) or wait for the quota to reset.';
   }
 
   if (/API key|PERMISSION_DENIED|401|403/i.test(raw)) {
