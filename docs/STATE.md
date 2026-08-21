@@ -29,6 +29,8 @@ Setup phase complete. Deployed and live at https://sweetjalapenos.vercel.app/
 | Gemini rolling aliases (`gemini-flash-latest`) | A pinned dated model was deprecated mid-setup; aliases track current stable. |
 | No LangGraph | AI SDK v7 already covers tool loops and human-in-loop approval. A second orchestration framework costs hours and wins no marks. |
 | LLM interprets, never computes | Ground truth comes from `py-service`; the model explains it. This is what stops demo hallucination. |
+| Model fallback chain, not a single model | Gemini free tier = 20 requests/DAY/MODEL (verified). Chain of 5 models gives ~100/day and survives concurrent users. |
+| Chat history in localStorage | Survives refresh mid-demo with zero backend. Per-browser only; move to Postgres if history must be shared. |
 
 ## Blocked / Known broken
 None.
@@ -49,3 +51,17 @@ you which features actually matter and which are decoration._
 - Pre-hackathon: UI foundation (component kit, app shell, notifications) added and verified.
 - Pre-hackathon: deployed to Vercel. Fixed model deprecation + Prisma/Vercel build failure.
 - Pre-hackathon: live agent status line (shimmer + per-tool verbs) and richer tool trace.
+- Pre-hackathon: reliability pass. Model fallback chain, chat persistence, scope guard.
+
+## Verified test results (pre-hackathon)
+| Check | Result |
+|---|---|
+| Gemini quota | **20 requests/day/model** (free tier), not per-minute. Per-model, so the chain multiplies it. |
+| 5 concurrent users | 5/5 succeed with fallback chain (was 1/5 with a single model). |
+| Quota exhausted | No crash. Chain switches models silently; friendly message only if all are spent. |
+| Simple response time | ~2.6s |
+| Tool call (chart) | ~4.4s |
+| 13KB prompt | Works, but ~19s. Avoid pasting large text live on stage. |
+| Memory within a chat | Works — full history is replayed each turn. |
+| History after refresh | Persists via localStorage. "New chat" button clears it. |
+| API key exposure | Not present in any client bundle. Server-side only. |

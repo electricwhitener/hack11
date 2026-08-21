@@ -5,16 +5,17 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Check, X } from 'lucide-react';
+import { Loader2, Check, X, RotateCcw } from 'lucide-react';
 import { Chart, type ChartSpec } from './Chart';
 import { AgentStatus } from './agent/AgentStatus';
 import { toolLabel } from './agent/toolLabels';
+import { loadMessages, saveMessages, clearMessages } from '@/lib/chatStorage';
 import { useNotifications } from '@/components/providers/notifications';
 
 export function Chat() {
   const [input, setInput] = useState('');
   const { push } = useNotifications();
-  const { messages, sendMessage, status, addToolApprovalResponse, error } = useChat({
+  const { messages, setMessages, sendMessage, status, addToolApprovalResponse, error } = useChat({
     transport: new DefaultChatTransport({ api: '/api/chat' }),
   });
 
@@ -24,6 +25,24 @@ export function Chat() {
   // Keep the newest content in view as tokens stream in.
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages, status]);
+
+  // Restore history AFTER mount, never during render: localStorage does not
+  // exist on the server, and seeding initial state from it causes a hydration
+  // mismatch. A one-frame empty flash is the correct trade.
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    const saved = loadMessages();
+    if (saved.length) setMessages(saved);
+  }, [setMessages]);
+
+  // Persist once a turn settles. Writing mid-stream would save half-formed
+  // messages and thrash localStorage on every token.
+  useEffect(() => {
+    if (!restored.current || status !== 'ready') return;
+    if (messages.length) saveMessages(messages);
   }, [messages, status]);
 
   return (
@@ -198,6 +217,22 @@ export function Chat() {
         <Button type="submit" disabled={busy}>
           {busy ? '…' : 'Send'}
         </Button>
+        {messages.length > 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="New chat"
+            title="New chat"
+            disabled={busy}
+            onClick={() => {
+              clearMessages();
+              setMessages([]);
+            }}
+          >
+            <RotateCcw className="size-4" />
+          </Button>
+        )}
       </form>
     </div>
   );

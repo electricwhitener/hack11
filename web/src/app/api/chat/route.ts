@@ -6,7 +6,7 @@ import {
   createUIMessageStreamResponse,
   type UIMessage,
 } from 'ai';
-import { chatModel, hasLLMKey, googleOptions } from '@/lib/ai/provider';
+import { hasLLMKey, modelById, MODEL_CHAIN, googleOptions } from '@/lib/ai/provider';
 import { tools } from '@/lib/ai/tools';
 import { SYSTEM_PROMPT } from '@/lib/ai/prompt';
 
@@ -18,27 +18,86 @@ export async function POST(req: Request) {
   // Mock mode: lets you build and demo the UI with no API key and zero quota burn.
   if (!hasLLMKey) return mockStream();
 
-  const result = streamText({
-    model: chatModel(),
-    system: SYSTEM_PROMPT,
-    messages: await convertToModelMessages(messages),
-    tools,
-    providerOptions: googleOptions,
-    // The agent loop: model -> tool -> model -> ... up to 5 turns.
-    // Without this it calls one tool and stops.
-    //
-    // Keep this number low. Each step is a separate API request, so this is a
-    // direct multiplier on your free-tier quota: at 8 steps, one user message
-    // could burn 8 of the 20 requests/minute Google allows.
-    stopWhen: stepCountIs(5),
-    // Google's free tier throttles hard. Two retries with backoff rides out a
-    // brief spike; more than that just makes the user stare at a spinner.
-    maxRetries: 2,
-  });
+  const modelMessages = await convertToModelMessages(messages);
 
-  return result.toUIMessageStreamResponse({
+  const stream = createUIMessageStream({
+    execute: async ({ writer }) => {
+      let lastError: unknown;
+
+      // Walk the chain. Google's free quota is per model per day, so an
+      // exhausted model is normal, not exceptional — move to the next one.
+      for (const id of MODEL_CHAIN) {
+        // streamText's own onError receives the REAL provider error. The promise
+        // below rejects with a bare "No output generated" and no `cause`, so this
+        // callback is the only place the 429 is actually visible.
+        let providerError: unknown;
+
+        try {
+          const result = streamText({
+            onError: ({ error }) => {
+              providerError = error;
+            },
+            model: modelById(id),
+            system: SYSTEM_PROMPT,
+            messages: modelMessages,
+            tools,
+            providerOptions: googleOptions,
+            // Each step is a separate API request, so this directly multiplies
+            // quota use. Keep it low.
+            stopWhen: stepCountIs(5),
+            // The chain is our real retry strategy; retrying an exhausted model
+            // just wastes seconds before failing anyway.
+            maxRetries: 0,
+          });
+
+          // `warnings` settles once the request is accepted but before the
+          // response finishes. Awaiting it surfaces a 429 or auth failure HERE,
+          // while we can still switch models, rather than mid-stream.
+          await result.warnings;
+
+          writer.merge(result.toUIMessageStream());
+          return;
+        } catch (error) {
+          lastError = providerError ?? error;
+          if (!isRetryableModelError(lastError)) break;
+        }
+      }
+
+      throw lastError ?? new Error('No model available');
+    },
     onError: friendlyError,
   });
+
+  return createUIMessageStreamResponse({ stream });
+}
+
+/**
+ * Flatten an error and its `cause` chain into one searchable string.
+ *
+ * The AI SDK wraps provider failures: a 429 surfaces as the unhelpful
+ * "No output generated. Check the stream for errors." with the real quota error
+ * buried in `.cause`. Matching only the top-level message misses every one.
+ */
+function errorText(error: unknown, depth = 0): string {
+  if (depth > 5 || error == null) return '';
+  if (typeof error === 'string') return error;
+  if (error instanceof Error) {
+    return `${error.message} ${errorText(error.cause, depth + 1)}`;
+  }
+  if (typeof error === 'object') {
+    const o = error as Record<string, unknown>;
+    return [o.message, o.statusCode, o.error, o.cause]
+      .map((v) => (typeof v === 'object' ? errorText(v, depth + 1) : String(v ?? '')))
+      .join(' ');
+  }
+  return String(error);
+}
+
+/** Quota and availability failures are worth trying the next model for. */
+function isRetryableModelError(error: unknown): boolean {
+  return /quota|rate.?limit|RESOURCE_EXHAUSTED|429|not found|404|unavailable|overloaded|503/i.test(
+    errorText(error),
+  );
 }
 
 /**
@@ -46,12 +105,10 @@ export async function POST(req: Request) {
  * during a demo, so they get a calm, specific message the user can act on.
  */
 function friendlyError(error: unknown): string {
-  const raw = error instanceof Error ? error.message : String(error);
+  const raw = errorText(error);
 
   if (/quota|rate.?limit|RESOURCE_EXHAUSTED|429/i.test(raw)) {
-    const seconds = raw.match(/retry in ([0-9.]+)s/i)?.[1];
-    const wait = seconds ? ` Try again in about ${Math.ceil(Number(seconds))} seconds.` : '';
-    return `The free Gemini quota was hit for a moment.${wait}`;
+    return 'Every available model has hit its free daily quota. Add another API key or wait for the quota to reset.';
   }
 
   if (/API key|PERMISSION_DENIED|401|403/i.test(raw)) {
@@ -59,7 +116,7 @@ function friendlyError(error: unknown): string {
   }
 
   if (/not found|404|deprecated/i.test(raw)) {
-    return 'That model is unavailable. Check MODEL_ID in your environment variables.';
+    return 'No configured model is available. Check MODEL_CHAIN in your environment variables.';
   }
 
   return 'Something went wrong reaching the AI service. Please try again.';

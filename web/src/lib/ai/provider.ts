@@ -32,6 +32,30 @@ export const MODEL_ID = process.env.MODEL_ID ?? 'gemini-3.5-flash';
 export const FAST_MODEL_ID = process.env.FAST_MODEL_ID ?? 'gemini-flash-lite-latest';
 
 /**
+ * FALLBACK CHAIN — the single most important reliability feature here.
+ *
+ * Google's free tier allows only 20 requests PER DAY PER MODEL (quota id
+ * GenerateRequestsPerDayPerProjectPerModel-FreeTier). Verified against the live
+ * API, not guessed. One model alone cannot survive a demo.
+ *
+ * Because the quota is scoped per model, listing several models multiplies the
+ * daily budget: 5 models x 20 = ~100 requests/day. The route tries each in turn
+ * and moves on when one is exhausted, so a dead model is invisible to the user.
+ *
+ * Order matters: best quality first, cheapest last.
+ */
+export const MODEL_CHAIN = (
+  process.env.MODEL_CHAIN ??
+  'gemini-3.5-flash,gemini-3.6-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest'
+)
+  .split(',')
+  .map((m) => m.trim())
+  .filter(Boolean);
+
+/** Build a model instance by id, for the fallback chain. */
+export const modelById = (id: string) => google(id);
+
+/**
  * Gemini 3.x "thinks" before answering by default, which roughly doubles
  * latency. Tool-calling agents rarely need much of it — the reasoning lives in
  * which tool gets called. Raise to 'medium' if answer quality suffers.
