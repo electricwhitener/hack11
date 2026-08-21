@@ -24,6 +24,8 @@ Nothing yet — waiting for the problem statement.
 | Python kept in a separate service | Lets one teammate work on analysis without touching the frontend. |
 | shadcn/ui on Base UI | Came with the CLI. Note: `render=` not `asChild`. |
 | Notification store built pre-emptively | Enables the proactive-agent pattern, the top differentiator. |
+| Prisma client committed to git | Vercel's npm blocks dependency install scripts, so `prisma generate` cannot run there. Regenerate locally via `npm run db:generate`. |
+| Gemini rolling aliases (`gemini-flash-latest`) | A pinned dated model was deprecated mid-setup; aliases track current stable. |
 
 ## Blocked / Known broken
 None.
@@ -42,3 +44,4 @@ you which features actually matter and which are decoration._
 ## Progress log
 - Pre-hackathon: scaffold built and verified.
 - Pre-hackathon: UI foundation (component kit, app shell, notifications) added and verified.
+- Pre-hackathon: deployed to Vercel. Fixed model deprecation + Prisma/Vercel build failure.

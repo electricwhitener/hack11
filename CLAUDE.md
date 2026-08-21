@@ -32,6 +32,11 @@ The product idea lives in `docs/STATE.md` — read that for current goals and st
 - **Prisma 7.** Import `PrismaClient` from `@/generated/prisma/client`, NOT
   `@prisma/client`. The connection URL lives in `prisma.config.ts`, NOT in
   `schema.prisma`. Use the `PrismaPg` driver adapter.
+- **`web/src/generated/` is COMMITTED to git on purpose. Do not gitignore it.**
+  Vercel's npm blocks dependency install scripts, so `prisma generate` cannot
+  run there. After editing `schema.prisma`, run `npm run db:generate` locally
+  and commit the result. Never add `prisma generate` to the `build` script —
+  that breaks the deploy.
 - **Tailwind v4.** Config is CSS-first in `globals.css`. There is no
   `tailwind.config.js` and you should not create one.
 - **shadcn/ui is built on Base UI here, NOT Radix.** There is no `asChild` prop.
