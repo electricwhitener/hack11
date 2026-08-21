@@ -7,8 +7,9 @@
 _One paragraph: what we are building and for whom. Fill in at kickoff._
 
 ## Now
-Setup phase complete. Deployed and live at https://sweetjalapenos.vercel.app/
-(agent verified responding with real Gemini in production).
+Setup phase complete. Live at https://sweetjalapenos.vercel.app/ with Gemini,
+Supabase auth (Google + email/password), and per-user chat history all verified
+working in production.
 
 **Next step:** run `/kickoff <problem statement>` when it drops.
 
@@ -29,6 +30,9 @@ Setup phase complete. Deployed and live at https://sweetjalapenos.vercel.app/
 | Gemini rolling aliases (`gemini-flash-latest`) | A pinned dated model was deprecated mid-setup; aliases track current stable. |
 | No LangGraph | AI SDK v7 already covers tool loops and human-in-loop approval. A second orchestration framework costs hours and wins no marks. |
 | LLM interprets, never computes | Ground truth comes from `py-service`; the model explains it. This is what stops demo hallucination. |
+| Supabase for auth + chat storage | One signup gives Postgres AND auth. RLS enforces per-user isolation in the database itself, verified by test. |
+| Google OAuth + email/password, NOT magic links | Supabase free tier throttles outbound email to a few per hour. Magic links or email OTP would silently fail if several judges signed up at once. |
+| App runs without Supabase configured | Missing env vars degrade to auth-free mode instead of failing the build/deploy. |
 | Model fallback chain, not a single model | Gemini free tier = 20 requests/DAY/MODEL (verified). Chain of 5 models gives ~100/day and survives concurrent users. |
 | Chat history in localStorage | Survives refresh mid-demo with zero backend. Per-browser only; move to Postgres if history must be shared. |
 
@@ -51,6 +55,8 @@ you which features actually matter and which are decoration._
 - Pre-hackathon: UI foundation (component kit, app shell, notifications) added and verified.
 - Pre-hackathon: deployed to Vercel. Fixed model deprecation + Prisma/Vercel build failure.
 - Pre-hackathon: live agent status line (shimmer + per-tool verbs) and richer tool trace.
+- Pre-hackathon: multi-key + multi-model fallback chain for Gemini free-tier quota (20 req/day PER MODEL).
+- Pre-hackathon: Supabase auth + server-side per-user chat history, conversations in a persistent sidebar.
 - Pre-hackathon: reliability pass. Model fallback chain, chat persistence, scope guard.
 
 ## Verified test results (pre-hackathon)
