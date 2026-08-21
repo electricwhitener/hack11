@@ -58,6 +58,13 @@ The product idea lives in `docs/STATE.md` — read that for current goals and st
 - New route at `/foo` requires `src/app/foo/page.tsx` to exist before any
   `<Link href="/foo">` will typecheck — routes are typed in Next 16.
 
+## Git
+- **Commit as the repo's configured author. Never override it** with
+  `git -c user.email=...`. The repo is configured as the owner's GitHub identity,
+  and Vercel silently **blocks** git-triggered deploys whose commit author is not
+  linked to the Vercel account. Blocked deploys look like nothing happened.
+- Verify with `git log --format='%an <%ae>' -1` after committing.
+
 ## Verify before claiming done
 ```
 cd web && npx tsc --noEmit && npm run build
