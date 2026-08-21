@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,12 @@ export function Chat() {
   });
 
   const busy = status === 'submitted' || status === 'streaming';
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Keep the newest content in view as tokens stream in.
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages, status]);
 
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col">
@@ -57,7 +63,14 @@ export function Chat() {
             {m.parts.map((part, i) => {
               if (part.type === 'text') {
                 return (
-                  <p key={i} className="whitespace-pre-wrap leading-relaxed">
+                  <p
+                    key={i}
+                    className={
+                      m.role === 'user'
+                        ? 'inline-block rounded-2xl rounded-tl-sm bg-muted px-3.5 py-2 whitespace-pre-wrap leading-relaxed'
+                        : 'whitespace-pre-wrap leading-relaxed'
+                    }
+                  >
                     {part.text}
                   </p>
                 );
@@ -158,6 +171,8 @@ export function Chat() {
         ))}
 
         <AgentStatus status={status} lastMessage={messages[messages.length - 1]} />
+
+        <div ref={bottomRef} />
 
         {error && (
           <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm">
