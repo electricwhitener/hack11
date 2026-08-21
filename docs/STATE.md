@@ -4,70 +4,94 @@
 > If this file is accurate, you can `/clear` freely and lose nothing.
 
 ## Product
-_One paragraph: what we are building and for whom. Fill in at kickoff._
+_One paragraph: what we are building and for whom. **Fill in at kickoff.**_
 
 ## Now
-Setup phase complete. Live at https://sweetjalapenos.vercel.app/ with Gemini,
-Supabase auth (Google + email/password), and per-user chat history all verified
-working in production.
+**Setup phase is COMPLETE.** Nothing is in progress. The scaffold is live at
+https://sweetjalapenos.vercel.app/ and everything below has been verified in
+production, not just locally.
 
-**Next step:** run `/kickoff <problem statement>` when it drops.
+**Next step:** the problem statements have been released. Run
+`/kickoff <paste the chosen problem statement>` in a FRESH session. Pick the
+idea and write the 90-second demo script before writing any code.
 
 ## Done
-- Scaffold ready: Next.js 16 + AI SDK v7 + Gemini, FastAPI sidecar, verified building.
-- UI foundation: shadcn/ui (15 components), AppShell with sidebar + mobile sheet,
-  dark mode, notification bell + toast store. Build verified, routes render.
+- **Agent**: Next.js 16 + AI SDK v7 + Gemini. Streaming, multi-step tool loop,
+  human-in-the-loop approval, generative-UI charts, live status line, tool trace.
+- **Quota resilience**: fallback chain across (key x model) pairs.
+- **Auth**: Supabase, Google OAuth + email/password. Confirmed working in prod.
+- **Chat history**: server-side per user in Postgres, RLS-isolated, listed in a
+  persistent sidebar.
+- **Python sidecar**: FastAPI + pandas/sklearn, upload/analyze/forecast.
+  NOT deployed — runs on localhost only.
+- **UI**: shadcn/ui (Base UI), AppShell, dark mode, notifications/toasts.
 
 ## Decisions
 | Decision | Reason |
 |---|---|
-| Gemini free tier via AI SDK | No card needed, generous quota, one-file provider swap. |
-| Agent tools over bespoke API routes | Every capability becomes something the agent can invoke and the judge can see. |
-| Python kept in a separate service | Lets one teammate work on analysis without touching the frontend. |
-| shadcn/ui on Base UI | Came with the CLI. Note: `render=` not `asChild`. |
-| Notification store built pre-emptively | Enables the proactive-agent pattern, the top differentiator. |
-| Prisma client committed to git | Vercel's npm blocks dependency install scripts, so `prisma generate` cannot run there. Regenerate locally via `npm run db:generate`. |
-| Gemini rolling aliases (`gemini-flash-latest`) | A pinned dated model was deprecated mid-setup; aliases track current stable. |
-| No LangGraph | AI SDK v7 already covers tool loops and human-in-loop approval. A second orchestration framework costs hours and wins no marks. |
+| Agent tools over bespoke API routes | Every capability becomes something the agent can invoke and a judge can see. |
 | LLM interprets, never computes | Ground truth comes from `py-service`; the model explains it. This is what stops demo hallucination. |
-| Supabase for auth + chat storage | One signup gives Postgres AND auth. RLS enforces per-user isolation in the database itself, verified by test. |
-| Google OAuth + email/password, NOT magic links | Supabase free tier throttles outbound email to a few per hour. Magic links or email OTP would silently fail if several judges signed up at once. |
-| App runs without Supabase configured | Missing env vars degrade to auth-free mode instead of failing the build/deploy. |
-| Model fallback chain, not a single model | Gemini free tier = 20 requests/DAY/MODEL (verified). Chain of 5 models gives ~100/day and survives concurrent users. |
-| Chat history in localStorage | Survives refresh mid-demo with zero backend. Per-browser only; move to Postgres if history must be shared. |
+| Python kept in a separate service | Lets one teammate work on analysis without touching the frontend. |
+| **Pinned `gemini-3.5-flash`, NOT a `-latest` alias** | Aliases track Google's newest model, which carries the tightest free quota (`gemini-3.7-flash` = 20/day). Deprecation takes months; quota exhaustion takes minutes. |
+| Fallback chain over a single model | Free tier is 20 requests/DAY/MODEL/PROJECT (verified against the live API). The chain walks every (key, model) pair, so extra keys and models multiply the daily budget. |
+| `thinkingLevel: 'low'` | Halves latency (~6.4s -> ~2.6s). Do NOT use `'minimal'` — `gemini-3.7-flash` rejects it outright with INVALID_ARGUMENT, failing the whole request. |
+| No LangGraph | AI SDK v7 already covers tool loops and approval. A second orchestration framework costs hours and wins no marks. |
+| Supabase for auth + chat storage | One signup gives Postgres AND auth. RLS enforces per-user isolation in the database itself. |
+| Google OAuth + email/password, NOT magic links or email OTP | Supabase free tier throttles outbound email to a few per hour — it would silently stop delivering if several judges signed up at once. Neither chosen method sends email. |
+| App runs without Supabase configured | Missing env vars degrade to auth-free mode instead of failing the deploy. |
+| Prisma client committed to git | Vercel's npm blocks dependency install scripts, so `prisma generate` cannot run there. Regenerate locally via `npm run db:generate`. Prisma is currently UNUSED — Supabase JS handles all data access. |
 
 ## Blocked / Known broken
-None.
+- **`py-service` is not deployed.** It runs on localhost only, so the
+  `runAnalysis` tool fails on the live site. If the chosen problem statement
+  needs Python in the demo, deploy it (Railway/Render, both free) early — do not
+  leave this to the last hours.
+- **Prisma is dead weight right now.** Configured and committed but nothing
+  imports `src/lib/db.ts`. Either use it for domain models or ignore it; do not
+  spend time "fixing" it.
 
 ## Do not touch
-- `web/src/lib/ai/provider.ts` — provider config is settled.
+- `web/src/lib/ai/provider.ts` — model choice and fallback chain are settled and
+  were tuned against measured quota/latency data. Changing the model id or
+  thinking level will re-break things that took a while to get right.
 - Do not add `tailwind.config.js`. Tailwind v4 is CSS-first.
+- Do not gitignore `web/src/generated/` — it must stay committed.
+- Do not use `DropdownMenuLabel` — it throws and takes down the page. See CLAUDE.md.
 
 ## Demo path
-_The exact click-by-click sequence shown to judges. Write this early — it tells
-you which features actually matter and which are decoration._
+_The exact click-by-click sequence shown to judges. Write this at kickoff — it
+tells you which features matter and which are decoration._
 1.
 2.
 3.
 
-## Progress log
-- Pre-hackathon: scaffold built and verified.
-- Pre-hackathon: UI foundation (component kit, app shell, notifications) added and verified.
-- Pre-hackathon: deployed to Vercel. Fixed model deprecation + Prisma/Vercel build failure.
-- Pre-hackathon: live agent status line (shimmer + per-tool verbs) and richer tool trace.
-- Pre-hackathon: multi-key + multi-model fallback chain for Gemini free-tier quota (20 req/day PER MODEL).
-- Pre-hackathon: Supabase auth + server-side per-user chat history, conversations in a persistent sidebar.
-- Pre-hackathon: reliability pass. Model fallback chain, chat persistence, scope guard.
+## First things to change at kickoff
+- `APP_NAME` in `web/src/components/layout/nav.ts` — currently "Untitled",
+  and it is the first thing a judge reads.
+- `SUGGESTIONS` at the top of `web/src/components/Chat.tsx` — the starter
+  prompts on the empty screen.
+- `SYSTEM_PROMPT` in `web/src/lib/ai/prompt.ts` — rewrite for the real domain.
+- `tools.ts` — replace the three sample tools with real ones.
+- `NAV` in `nav.ts` — the sidebar links (Dashboard/Data/Settings are placeholders).
 
 ## Verified test results (pre-hackathon)
 | Check | Result |
 |---|---|
-| Gemini quota | **20 requests/day/model** (free tier), not per-minute. Per-model, so the chain multiplies it. |
-| 5 concurrent users | 5/5 succeed with fallback chain (was 1/5 with a single model). |
-| Quota exhausted | No crash. Chain switches models silently; friendly message only if all are spent. |
+| Gemini free-tier quota | **20 requests/day/model/project** — verified from the API's own quota error, NOT per-minute. |
 | Simple response time | ~2.6s |
 | Tool call (chart) | ~4.4s |
-| 13KB prompt | Works, but ~19s. Avoid pasting large text live on stage. |
+| ~7,200-word prompt | Works, but ~18s. Avoid pasting large text live on stage. |
+| 500K-row / 12MB CSV | Uploads and analyses in <1s via py-service. |
+| Empty / malformed CSV | Returns a clean 4xx, no crash (was an unhandled 500). |
 | Memory within a chat | Works — full history is replayed each turn. |
-| History after refresh | Persists via localStorage. "New chat" button clears it. |
-| API key exposure | Not present in any client bundle. Server-side only. |
+| Chat history per user | Persists server-side; separate accounts see separate chats. |
+| RLS isolation | User B cannot list, read, or delete user A's chats. Verified directly against the API. |
+| API key exposure | Gemini key absent from all client bundles. Server-side only. |
+| Quota exhausted mid-request | Chain silently switches model; friendly message only when all are spent. |
+
+### Tested but NOT re-verified after later changes
+- **Concurrency.** 5 simultaneous users were tested BEFORE the fallback chain
+  existed: 4 of 5 failed on quota. The chain should fix this, but it has not
+  been re-tested under concurrent load. Worth one run before judging.
+- **Interactive browser flows** were verified by the user manually, not by
+  automated test: login, sign-out, switching between saved conversations.
