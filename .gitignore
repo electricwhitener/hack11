@@ -6,7 +6,10 @@ dist/
 .env
 .env.local
 .env*.local
-web/src/generated/
+# Prisma client is COMMITTED on purpose: Vercel blocks dependency install
+# scripts (npm allow-scripts), so `prisma generate` cannot run there.
+# After editing schema.prisma run `npx prisma generate` locally and commit.
+# web/src/generated/
 .venv/
 __pycache__/
 *.pyc
