@@ -1,32 +1,30 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai';
+import { isToolUIPart, getToolName } from 'ai';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Check, X, RotateCcw } from 'lucide-react';
+import { Loader2, Check, X } from 'lucide-react';
 import { Chart, type ChartSpec } from './Chart';
 import { AgentStatus } from './agent/AgentStatus';
 import { toolLabel } from './agent/toolLabels';
-import {
-  listChats,
-  loadChat,
-  createChat,
-  saveChat,
-  deleteChat,
-  titleFrom,
-  type ChatSummary,
-} from '@/lib/chatStorage';
+import { useChatSession } from './agent/ChatProvider';
 import { useNotifications } from '@/components/providers/notifications';
-import { ChatHistory } from './agent/ChatHistory';
+
+/**
+ * Starter prompts. An empty chat box with no examples is the single most
+ * common reason a demo stalls — replace these with ones that show off whatever
+ * the problem statement turns out to be.
+ */
+const SUGGESTIONS = [
+  'Chart these sales: Jan 120, Feb 150, Mar 175, Apr 210',
+  'What can you do?',
+];
 
 export function Chat() {
   const [input, setInput] = useState('');
   const { push } = useNotifications();
-  const { messages, setMessages, sendMessage, status, addToolApprovalResponse, error } = useChat({
-    transport: new DefaultChatTransport({ api: '/api/chat' }),
-  });
+  const { messages, sendMessage, status, addToolApprovalResponse, error } = useChatSession();
 
   const busy = status === 'submitted' || status === 'streaming';
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -36,102 +34,36 @@ export function Chat() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, status]);
 
-  // null until the first message is sent — a conversation row is only created
-  // when there is something to put in it, so empty chats never clutter the list.
-  const [chatId, setChatId] = useState<string | null>(null);
-  const [chats, setChats] = useState<ChatSummary[]>([]);
-
-  async function refreshChats() {
-    setChats(await listChats());
-  }
-
-  // Load the conversation list on mount. Deliberately does NOT auto-open the
-  // most recent one: landing in a half-remembered conversation is disorienting,
-  // and the history panel is one click away.
-  useEffect(() => {
-    void refreshChats();
-  }, []);
-
-  // Persist once a turn settles. Writing mid-stream would save half-formed
-  // messages on every token.
-  const saving = useRef(false);
-  useEffect(() => {
-    if (status !== 'ready' || !messages.length || saving.current) return;
-
-    saving.current = true;
-    void (async () => {
-      try {
-        let id = chatId;
-        if (!id) {
-          const created = await createChat(titleFrom(messages));
-          if (!created) return;
-          id = created.id;
-          setChatId(id);
-        }
-        await saveChat(id, messages, titleFrom(messages));
-        await refreshChats();
-      } finally {
-        saving.current = false;
-      }
-    })();
-  }, [messages, status, chatId]);
-
-  function startNewChat() {
-    setChatId(null);
-    setMessages([]);
-  }
-
-  async function selectChat(id: string) {
-    const loaded = await loadChat(id);
-    if (!loaded) return;
-    setChatId(id);
-    setMessages(loaded.messages);
-  }
-
-  async function removeChat(id: string) {
-    await deleteChat(id);
-    await refreshChats();
-    if (id === chatId) startNewChat();
-  }
-
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col">
-      <div className="flex shrink-0 items-center gap-1 border-b px-2 py-1.5">
-        <ChatHistory
-          chats={chats}
-          activeId={chatId}
-          onSelect={selectChat}
-          onDelete={removeChat}
-        />
-        <span className="truncate text-xs text-muted-foreground">
-          {chats.find((c) => c.id === chatId)?.title ?? 'New chat'}
-        </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="ml-auto"
-          aria-label="New chat"
-          title="New chat"
-          disabled={busy || messages.length === 0}
-          onClick={startNewChat}
-        >
-          <RotateCcw className="size-4" />
-        </Button>
-      </div>
-
       <div className="flex-1 space-y-5 overflow-y-auto p-4">
         {messages.length === 0 && (
-          <div className="mt-24 text-center">
-            <p className="text-sm text-muted-foreground">
-              Ask the agent something. It can chart data, run analyses, and request
-              your approval before acting.
+          <div className="mx-auto mt-20 max-w-md text-center">
+            <h2 className="text-lg font-medium">What can I help you with?</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              I can chart data, run analyses on your datasets, and ask your approval
+              before taking any real action.
             </p>
+
+            <div className="mt-6 grid gap-2 text-left">
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => sendMessage({ text: s })}
+                  disabled={busy}
+                  className="rounded-lg border bg-card px-3.5 py-2.5 text-sm text-muted-foreground transition hover:border-foreground/20 hover:text-foreground disabled:opacity-50"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+
             {/* Demo trigger for the proactive-notification pattern. Delete once
                 a real event source pushes notifications. */}
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              className="mt-4"
+              className="mt-4 text-xs text-muted-foreground"
               onClick={() =>
                 push({
                   title: 'Agent noticed something',

@@ -40,16 +40,40 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 /**
  * Page frame: fixed sidebar on desktop, slide-out on mobile.
  * Wrap page content in this. The `title` shows in the header bar.
+ *
+ * `sidebarExtra` fills the space under the nav links — the agent page passes
+ * its conversation list there so past chats are always visible rather than
+ * buried behind an icon.
  */
-export function AppShell({ title, children }: { title?: string; children: React.ReactNode }) {
+export function AppShell({
+  title,
+  children,
+  sidebarExtra,
+}: {
+  title?: string;
+  children: React.ReactNode;
+  sidebarExtra?: React.ReactNode;
+}) {
+  const sidebarBody = (onNavigate?: () => void) => (
+    <>
+      <NavLinks onNavigate={onNavigate} />
+      {sidebarExtra ? (
+        <>
+          <div className="mx-3 border-t" />
+          <div className="flex min-h-0 flex-1 flex-col pt-3">{sidebarExtra}</div>
+        </>
+      ) : null}
+    </>
+  );
+
   return (
     <div className="flex h-dvh overflow-hidden">
       {/* Desktop sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r bg-sidebar md:flex">
-        <div className="flex h-14 items-center border-b px-5 font-semibold tracking-tight">
+      <aside className="hidden w-64 shrink-0 flex-col border-r bg-sidebar md:flex">
+        <div className="flex h-14 shrink-0 items-center border-b px-5 font-semibold tracking-tight">
           {APP_NAME}
         </div>
-        <NavLinks />
+        {sidebarBody()}
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -63,11 +87,11 @@ export function AppShell({ title, children }: { title?: string; children: React.
             >
               <Menu className="size-4" />
             </SheetTrigger>
-            <SheetContent side="left" className="w-60 p-0">
-              <SheetTitle className="flex h-14 items-center border-b px-5 text-base font-semibold">
+            <SheetContent side="left" className="flex w-64 flex-col p-0">
+              <SheetTitle className="flex h-14 shrink-0 items-center border-b px-5 text-base font-semibold">
                 {APP_NAME}
               </SheetTitle>
-              <NavLinks />
+              {sidebarBody()}
             </SheetContent>
           </Sheet>
 

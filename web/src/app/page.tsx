@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
-import { AppShell } from '@/components/layout/AppShell';
-import { Chat } from '@/components/Chat';
+import { ChatWorkspace } from '@/components/agent/ChatWorkspace';
 import { createClient } from '@/lib/supabase/server';
 import { hasSupabase } from '@/lib/supabase/config';
 
@@ -19,9 +18,5 @@ export default async function Home() {
     if (!user) redirect('/login');
   }
 
-  return (
-    <AppShell title="Agent">
-      <Chat />
-    </AppShell>
-  );
+  return <ChatWorkspace />;
 }
