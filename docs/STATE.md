@@ -76,6 +76,20 @@ bucketing; per-request would be 3.5M distance tests per page view.
 - `closed` — nothing legal exists. **No route is drawn.** Telling somebody they
   cannot get there beats sending them 2.5 km to a locked gate
 
+**The hostel gate is the only permission barrier**, 21:00–06:00, and it is the
+only thing that should ever produce an outpass alert. Its note is
+direction-aware: a portal may carry `enterNote`, used when the walk ENDS in the
+first zone it connects, because "leaving needs an outpass" is the wrong sentence
+for somebody trying to get back into their own block at midnight.
+
+**A shut gate stops you passing through it; it does not make the pavement beside
+it disappear.** The university-entrance rule used to match `/university
+entrance/` against 18 segments, including footpaths and walkways that run PAST
+the gate and never leave campus. Shutting those at 11pm cut a corner of campus
+in half and made late walks read `closed` when the real obstacle was nowhere
+near the hostel. It matches carriageways only now. Anything that governs
+crossing BETWEEN zones belongs in `PORTALS`, not in a label rule.
+
 **Zones and portals** decide reachability *before* any graph search:
 `hostel <-> campus` via subway + hostel gate; `campus <-> outside` via the three
 university entrances. Graph-only routing kept finding perimeter geometry no
@@ -105,8 +119,7 @@ be walked through?*. The note field is prose for walkers and is read by nobody.
 |---|---|
 | `path_reports` | citizen reports: `segment_idx`, `dark_count`, `lit_count` |
 | `path_surveys` | surveyed truth: `lighting` (lit/dim/dark), `traffic`, `blocked`, `note` |
-| `checkpoints` | surveyor-placed points: gates, security, shops |
-
+| `checkpoints` | surveyor-placed points: gates, security, shops, and gate hours |
 | `place_overrides` | corrections to imported landmarks: `hidden`, `display_name` |
 
 Migrations applied: `docs/sql/002_survey.sql`, `docs/sql/003_blocked.sql`.
@@ -270,8 +283,9 @@ Postgres — no network, safe to run mid-survey. Run it after touching any of th
 
 **These will change once survey data lands. Regenerate before quoting them.**
 
-Time-aware demo sequence (B3 Block → Central Library):
-`20:00 ok 339 m` · `21:30 ok 432 m` · `23:30 permission — outpass required`
+Time-aware demo sequence (Central Library → B3 Block, walking home):
+`20:00 ok 339 m` · `21:00 ok 432 m` · `23:00 permission — outpass to get back in`
+`02:00 permission` (the window wraps midnight) · `06:00 ok 339 m`
 
 ---
 
