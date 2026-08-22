@@ -72,25 +72,22 @@ const MAX_REPORT_M = 50;
  */
 const C = {
   /*
-   * VIVID, BUT STILL A HIERARCHY.
+   * Built from a true green -> xanthous -> cinnabar ramp. Saturated, warm-
+   * shifting, no mint anywhere.
    *
-   * Desaturating the majority state made it recede — and made the map dull.
-   * The hierarchy does not need low chroma, because warm and cool already do
-   * the work: warm hues advance toward the viewer, cool hues fall back. So all
-   * three can be fully saturated and the eye still lands on danger first.
+   * Dartmouth green (#0C6B37) is the reference for "lit", but at L~23% it
+   * disappears against a dark basemap, so the line colour is that hue lifted to
+   * carry on a night map. Amber and red are used exactly as given — they sit at
+   * high lightness already and need no help.
    *
-   *   lit   cool spring green, high chroma, held back by opacity and weight
-   *   dim   warm amber, advancing
-   *   dark  hot crimson, highest chroma AND warmest AND thickest — three
-   *         separate cues pointing the same way
-   *
-   * Hue still sweeps one continuous arc (160 -> 75 -> 5), so the three read as
-   * a scale. Lightness stays roughly level, which keeps the safe end from
-   * looking washed out on a grey basemap.
+   * The hierarchy no longer leans on desaturation at all. It comes from hue
+   * temperature (green recedes, red advances), from opacity, and from line
+   * weight — three cues, all pointing at the dark stretches.
    */
-  lit: '#2FD8A6', // spring green — vivid, but cool, so it sits back
-  dim: '#FFB020', // amber — warm, steps forward
-  dark: '#FF2D55', // crimson — hottest, most saturated, unmissable
+  lit: '#13A34B', // Dartmouth green, lifted for a dark canvas
+  dim: '#F8B324', // xanthous
+  dark: '#EB442C', // cinnabar
+  darkDeep: '#BC2023', // fire brick — the glow beneath the worst stretches
   tunnel: '#5B9DFF', // clear blue: a different KIND of path
   blocked: '#4A4A52', // near-invisible on purpose; it is not a route
   muted: '#2C2C31', // off-route, when a walk is being shown
@@ -99,7 +96,7 @@ const C = {
 } as const;
 
 /** Opacity carries hierarchy too: the common case sits back, danger sits forward. */
-const OPACITY = { lit: 0.78, dim: 0.95, dark: 1 } as const;
+const OPACITY = { lit: 0.85, dim: 1, dark: 1 } as const;
 
 /** Thresholds shared with the inspector's wording, so they never disagree. */
 const DIM_AT = 0.35;
@@ -423,6 +420,21 @@ export function DarkZoneMap() {
 
       // Flat colour everywhere. Nothing on the network glows — the glow is
       // reserved for the safer route, where it means "take this one".
+      /*
+       * Dark AND busy is the one combination the product exists to surface, so
+       * it gets a fire-brick bloom in the blurred pane. Not another colour to
+       * decode — just weight of presence, so the eye lands there first.
+       */
+      if (darkness > DARK_AT && exposure > 0.12) {
+        L.polyline(line, {
+          color: C.darkDeep,
+          weight: 9,
+          opacity: 0.5,
+          renderer: glowRenderer.current ?? undefined,
+          pane: 'glow',
+        }).addTo(glowLayer.current);
+      }
+
       L.polyline(line, {
         color: segColor(darkness),
         weight: (focus ? 1.6 : 0) + segWeight(exposure, darkness),

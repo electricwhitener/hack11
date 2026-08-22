@@ -17,15 +17,20 @@ export type Checkpoint = {
 /**
  * The kinds that matter for routing legality.
  *
- * Entrances and gates are not decoration: on this campus they are the ONLY
- * lawful way between the hostel, the campus and the outside, so mapping them
- * precisely is what stops the router inventing a shortcut through a wall.
+ * "Entrance" and "Exit" used to be separate options, which forced a false
+ * choice: almost every gate on this campus works in both directions, and there
+ * was no way to say so. A gate is now one kind that goes both ways, with
+ * one-way variants for the cases that really are one-way.
+ *
+ * These are not decoration. On this campus they are the ONLY lawful way between
+ * the hostel, the campus and the outside, so mapping them precisely is what
+ * stops the router inventing a shortcut through a wall.
  */
-export const CHECKPOINT_KINDS: { value: string; label: string; colour: string }[] = [
-  { value: 'entrance', label: 'Entrance', colour: '#4ADE80' },
-  { value: 'exit', label: 'Exit', colour: '#38BDF8' },
-  { value: 'gate', label: 'Gate / barrier', colour: '#FBBF24' },
-  { value: 'emergency', label: 'Security / medical', colour: '#F43F5E' },
+export const CHECKPOINT_KINDS: { value: string; label: string; colour: string; hint?: string }[] = [
+  { value: 'gate', label: 'Gate', colour: '#F8B324', hint: 'Goes both ways' },
+  { value: 'entry_only', label: 'Entry only', colour: '#13A34B', hint: 'In, not out' },
+  { value: 'exit_only', label: 'Exit only', colour: '#5B9DFF', hint: 'Out, not in' },
+  { value: 'emergency', label: 'Security / medical', colour: '#EB442C' },
   { value: 'shop', label: 'Shop / food', colour: '#C084FC' },
   { value: 'landmark', label: 'Landmark', colour: '#94A3B8' },
 ];
@@ -45,7 +50,7 @@ export function CheckpointEditor({
   onCancel: () => void;
 }) {
   const [name, setName] = useState(draft.name);
-  const [kind, setKind] = useState(draft.kind || 'entrance');
+  const [kind, setKind] = useState(draft.kind || 'gate');
   const [note, setNote] = useState(draft.note ?? '');
   const editing = Boolean(draft.id);
 
@@ -71,7 +76,7 @@ export function CheckpointEditor({
           autoFocus
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Name — e.g. AB1 North Entrance"
+          placeholder="Name — e.g. AB1 North Gate"
           className="h-9 text-sm"
         />
 
@@ -81,7 +86,8 @@ export function CheckpointEditor({
               key={k.value}
               type="button"
               onClick={() => setKind(k.value)}
-              className={`rounded-md border px-1.5 py-1.5 text-[11px] transition-colors ${
+              title={k.hint}
+              className={`rounded-md border px-1.5 py-1.5 text-[11px] leading-tight transition-colors ${
                 kind === k.value
                   ? 'border-transparent font-medium text-background'
                   : 'bg-background text-muted-foreground hover:text-foreground'
@@ -89,6 +95,9 @@ export function CheckpointEditor({
               style={kind === k.value ? { backgroundColor: k.colour } : undefined}
             >
               {k.label}
+              {k.hint ? (
+                <span className="block text-[9px] font-normal opacity-75">{k.hint}</span>
+              ) : null}
             </button>
           ))}
         </div>
