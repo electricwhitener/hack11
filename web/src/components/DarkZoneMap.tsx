@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { Map as LMap, LayerGroup, Canvas, SVG } from 'leaflet';
+import type { Map as LMap, LayerGroup, Canvas } from 'leaflet';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Flag, MapPin, Sparkles } from 'lucide-react';
@@ -163,7 +163,6 @@ export function DarkZoneMap() {
   const hoverLayer = useRef<LayerGroup | null>(null);
   const LRef = useRef<typeof import('leaflet') | null>(null);
   const glowRenderer = useRef<Canvas | null>(null);
-  const pinRenderer = useRef<SVG | null>(null);
   const segRef = useRef<Segment[]>([]);
   // Leaflet binds handlers once, so they must read modes through refs.
   const modeRef = useRef<MapMode>('none');
@@ -265,21 +264,6 @@ export function DarkZoneMap() {
        * falls through to the canvas everywhere else. Only ~40 markers render
        * this way — the 1,883 segments stay on canvas, where they belong.
        */
-      m.createPane('pins');
-      const pinPane = m.getPane('pins')!;
-      pinPane.style.zIndex = '640'; // above the overlay canvas (400), below popups (700)
-      /*
-       * The PANE must not take clicks, only the pins in it.
-       *
-       * A pane is a plain transparent div stretched over the whole map, and a
-       * transparent div still swallows every click — which would make the
-       * entire map unclickable. Leaflet's own stylesheet re-enables just the
-       * drawn shapes (`.leaflet-pane > svg path.leaflet-interactive`), so
-       * switching the pane off and letting that rule switch the pins back on
-       * is what makes a click land on a pin and pass through everywhere else.
-       */
-      pinPane.style.pointerEvents = 'none';
-      pinRenderer.current = L.svg({ pane: 'pins' });
 
       map.current = m;
       glowLayer.current = L.layerGroup().addTo(m);
@@ -730,27 +714,39 @@ export function DarkZoneMap() {
   }
 
   /**
-   * An invisible, generous tap target centred on a pin.
+   * A pin, as a real DOM element rather than something drawn on the canvas.
    *
-   * RADIUS MUST STAY ABOVE 10. Leaflet treats a circle of radius <= 10 as a
-   * marker and hands the MAP the pin's own coordinate instead of the cursor's
-   * — so a smaller halo would make every tap near a pin inspect the path under
-   * the PIN rather than the one under your finger.
+   * Canvas and SVG were both wrong for this. With preferCanvas the pins shared
+   * one canvas with 1,883 polylines, and canvas hit-testing picks the LAST
+   * layer drawn — paintSegments re-adds every polyline on each repaint, so the
+   * segments kept overtaking the pins and burying them. A marker lives in
+   * Leaflet's markerPane as an HTML div above the whole overlay, where nothing
+   * the canvas draws can reach it and a click is an ordinary DOM click.
+   *
+   * The container is 34px and pointer-events: none; the inner .pin-hit takes
+   * the clicks and grows to fill it in "Map a point" mode (see globals.css).
+   * So the tap target is thumb-sized exactly when you are editing pins, and
+   * stays tight the rest of the time — otherwise every pin would sit on a
+   * 34px dead zone over paths you still need to report.
    */
-  function hitHalo(
+  function pinMarker(
     L: typeof import('leaflet'),
     at: [number, number],
+    colour: string,
+    extraClass: string,
     onClick: (ev: L.LeafletMouseEvent) => void,
   ) {
-    return L.circleMarker(at, {
-      radius: 15,
-      stroke: false,
-      // Not 0: an SVG path resolves `pointer-events: auto` to visiblePainted,
-      // and a fully transparent fill is not reliably hit-testable everywhere.
-      // 0.01 is invisible to the eye and unambiguously painted to the browser.
-      fillOpacity: 0.01,
-      fillColor: '#ffffff',
-      renderer: pinRenderer.current ?? undefined,
+    return L.marker(at, {
+      icon: L.divIcon({
+        className: `pin ${extraClass}`,
+        html: `<span class="pin-hit"><span class="pin-dot" style="background:${colour}"></span></span>`,
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
+      }),
+      // Leaflet defaults a Marker to NOT bubbling, which would silently eat
+      // every click near a pin while reporting a path. We decide instead.
+      bubblingMouseEvents: true,
+      keyboard: false,
     }).on('click', onClick);
   }
 
@@ -776,18 +772,13 @@ export function DarkZoneMap() {
         setPlaceDraft({ name: p.name, kind: p.kind, renamed: renamedRef.current.has(p.name) });
       };
 
-      hitHalo(L, [p.at.lat, p.at.lng], open).addTo(layer);
-
-      const marker = L.circleMarker([p.at.lat, p.at.lng], {
-        radius: p.kind === 'hostel' ? 5 : 4,
-        color: p.kind === 'hostel' ? '#93c5fd' : '#cbd5e1',
-        fillColor: p.kind === 'hostel' ? '#3b82f6' : '#94a3b8',
-        fillOpacity: 0.9,
-        weight: 1.5,
-        renderer: pinRenderer.current ?? undefined,
-      }).bindTooltip(p.name, { direction: 'top' });
-
-      marker.on('click', open);
+      const marker = pinMarker(
+        L,
+        [p.at.lat, p.at.lng],
+        p.kind === 'hostel' ? '#3b82f6' : '#94a3b8',
+        'pin-lm',
+        open,
+      ).bindTooltip(p.name, { direction: 'top' });
       marker.addTo(layer);
     }
   }
@@ -871,20 +862,14 @@ export function DarkZoneMap() {
         setDraft(c);
       };
 
-      // The hit target is far bigger than the dot. This is tapped with a thumb,
-      // on a phone, on a dark path — a 6px circle is not a target.
-      hitHalo(L, [c.lat, c.lng], open).addTo(layer);
-
-      const marker = L.circleMarker([c.lat, c.lng], {
-        radius: 6,
-        color: '#0b0f14',
-        fillColor: kindColour(c.kind),
-        fillOpacity: 1,
-        weight: 2,
-        renderer: pinRenderer.current ?? undefined,
-      }).bindTooltip(`${c.name}${c.note ? ` — ${c.note}` : ''}`, { direction: 'top' });
-
-      marker.on('click', open);
+      const shut = c.barrier === 'hard' && !(c.closes && c.opens);
+      const marker = pinMarker(L, [c.lat, c.lng], kindColour(c.kind), 'pin-cp', open)
+        .bindTooltip(
+          `${c.name}${shut ? ' — always shut' : c.closes ? ` — shut ${c.closes}–${c.opens}` : ''}${
+            c.note ? ` · ${c.note}` : ''
+          }`,
+          { direction: 'top' },
+        );
       marker.addTo(layer);
     }
   }
@@ -976,7 +961,9 @@ export function DarkZoneMap() {
 
   return (
     <div
-      className={`relative h-full ${mode === 'none' ? '' : '[&_.leaflet-container]:cursor-crosshair'}`}
+      className={`relative h-full ${mode === 'none' ? '' : '[&_.leaflet-container]:cursor-crosshair'} ${
+        mode === 'place' ? 'map-placing' : ''
+      }`}
     >
       <div ref={holder} className="absolute inset-0" />
 

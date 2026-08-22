@@ -218,3 +218,60 @@
 @theme inline {
   --animate-shimmer: shimmer 2s linear infinite;
 }
+
+/*
+ * Map pins.
+ *
+ * Real DOM elements in Leaflet's markerPane, NOT shapes on the segment canvas.
+ * Canvas hit-testing picks the last layer drawn, and paintSegments re-adds all
+ * 1,883 polylines on every repaint, so anything sharing that canvas gets buried
+ * by the segments the moment the map redraws. A div cannot be buried.
+ *
+ * The 34px container takes no clicks; the inner .pin-hit does, and grows to
+ * fill the container only while placing points — so the target is thumb-sized
+ * exactly when pins are being edited, and stays tight the rest of the time,
+ * when the paths underneath still need to be reportable.
+ */
+.pin {
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: 0;
+}
+
+.pin-hit {
+  pointer-events: auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: width 120ms ease, height 120ms ease, background-color 120ms ease;
+}
+
+.map-placing .pin-hit {
+  width: 34px;
+  height: 34px;
+  background: rgb(255 255 255 / 0.1);
+}
+
+.map-placing .pin-hit:hover {
+  background: rgb(255 255 255 / 0.22);
+}
+
+.pin-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 9999px;
+  border: 2px solid #0b0f14;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.5);
+}
+
+/* Imported landmarks sit behind surveyor-placed points in importance. */
+.pin-lm .pin-dot {
+  width: 10px;
+  height: 10px;
+  border-width: 1.5px;
+}

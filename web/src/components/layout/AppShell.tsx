@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Lamp } from 'lucide-react';
 import { NAV, APP_NAME } from './nav';
 import { UserMenu } from './UserMenu';
 
@@ -32,7 +32,15 @@ export function AppShell({
     <div className="flex h-dvh flex-col overflow-hidden bg-background">
       <header className="z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-card px-3 md:px-4">
         <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-          <Lamp className="size-5 text-primary" />
+          {/* The mark carries the warm palette on its own, so it needs no tint. */}
+          <Image
+            src="/logo.png"
+            alt=""
+            width={28}
+            height={28}
+            priority
+            className="size-7 rounded-[7px] shadow-sm ring-1 ring-white/10"
+          />
           <span className="hidden sm:inline">{APP_NAME}</span>
         </Link>
 

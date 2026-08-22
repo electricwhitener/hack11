@@ -470,28 +470,25 @@ export const ACCESS_RULES: AccessRule[] = [
     tunnel: true,
     note: 'The subway underpass is shut from 11pm. There is no way through it.',
   },
-  {
-    /*
-     * Carriageways only — NOT every path whose name mentions the entrance.
-     *
-     * `/university entrance/` matched 18 segments, including "Footpath by
-     * University Entrance" and "Walkway by University Entrance": paths that
-     * run PAST the gate without going through it and never leave campus.
-     * Shutting them at 11pm made a whole corner of campus impassable, and
-     * that, not the hostel gate, was what collapsed the late-night walk to
-     * "closed" — the route could reach the hostel gate but not the ground on
-     * the other side of it.
-     *
-     * A shut gate stops you passing THROUGH it. It does not make the pavement
-     * beside it disappear. Crossing between campus and outside is still
-     * governed by PORTALS, which is the right place for it.
-     */
-    match: /^(service )?road by university entrance|main gate/i,
-    closes: '23:00',
-    opens: '05:00',
-    barrier: 'hard',
-    note: 'The university entrance is shut from 11pm. You cannot enter or leave campus through it.',
-  },
+  /*
+   * THE UNIVERSITY ENTRANCE IS NOT AN ACCESS_RULE AT ALL ANY MORE.
+   *
+   * It used to shut every segment whose label mentioned it — 18 of them,
+   * including "Footpath by University Entrance", "Walkway by ...", and
+   * "Service road by ...", paths that run PAST the gate without going through
+   * it and never leave campus. At 11pm that cut a corner of campus in half and
+   * made walks between two campus landmarks report `closed`, with the blame
+   * landing on a gate nowhere near either end of the walk.
+   *
+   * A shut gate stops you passing THROUGH it. It does not make the pavement
+   * beside it impassable. Crossing between campus and outside is decided by
+   * PORTALS, before any graph search — which is the right place for it, and
+   * where the 11pm closure still lives. Nothing about the closure is lost;
+   * only the collateral damage is.
+   *
+   * The subway keeps its rule, because the subway genuinely IS the segments:
+   * an enclosed underpass that is locked, not a gate you can walk around.
+   */
   {
     match: /hostel (entrance|gate)|ghs (main )?road/i,
     closes: '21:00',
