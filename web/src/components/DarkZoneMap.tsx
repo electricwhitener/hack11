@@ -71,15 +71,38 @@ const MAX_REPORT_M = 50;
  * estimate is off, a line is slightly too thick, not the wrong colour.
  */
 const C = {
-  lit: '#34D399', // green — lamplight reaches here
-  dim: '#F5A524', // amber — edge of the light, or a lamp across the road
-  dark: '#F04E6E', // red — no light
-  tunnel: '#74A9FF', // enclosed passage: a different KIND of path, not a darkness
-  blocked: '#6B7280', // marked unwalkable on the ground
+  /*
+   * VISUAL HIERARCHY, not a rainbow.
+   *
+   * Roughly 80% of this campus is lit. Painting the majority state in loud
+   * saturated green made the map shout its least useful information — the eye
+   * has nowhere to land. So the ramp runs quiet -> warm -> hot, and lightness
+   * and chroma both climb with danger:
+   *
+   *   lit   L .58  C .06   recedes toward the basemap; "nothing to see"
+   *   dim   L .74  C .11   warm, noticeable, not alarming
+   *   dark  L .68  C .20   the only high-chroma colour on the map
+   *
+   * Hue also moves 165 -> 75 -> 20, a single continuous sweep round the wheel
+   * rather than three unrelated colours, so the three read as one scale.
+   *
+   * Deliberately NOT a red/green pair at equal saturation: that is the worst
+   * case for deuteranopia and it is what the previous palette was. Here the
+   * safe end is desaturated blue-green and the danger end is a light warm red,
+   * so they separate by lightness and chroma as well as hue.
+   */
+  lit: '#5C9084', // muted sea green — the quiet majority
+  dim: '#E3A857', // soft amber — edge of the light
+  dark: '#FF6B81', // warm coral — the only thing that pops
+  tunnel: '#7FA9E8', // periwinkle: a different KIND of path, cool and calm
+  blocked: '#4A4A52', // near-invisible on purpose; it is not a route
   muted: '#2C2C31', // off-route, when a walk is being shown
   bulbCore: '#FFE3B0', // the safer route itself
   bulbGlow: '#E8901F',
 } as const;
+
+/** Opacity carries hierarchy too: the common case sits back, danger sits forward. */
+const OPACITY = { lit: 0.62, dim: 0.9, dark: 1 } as const;
 
 /** Thresholds shared with the inspector's wording, so they never disagree. */
 const DIM_AT = 0.35;
@@ -91,9 +114,17 @@ function segColor(darkness: number): string {
   return C.dark;
 }
 
+function segOpacity(darkness: number): number {
+  if (darkness <= DIM_AT) return OPACITY.lit;
+  if (darkness <= DARK_AT) return OPACITY.dim;
+  return OPACITY.dark;
+}
+
 /** Busier paths draw thicker. The only place foot traffic shows on the map. */
-function segWeight(exposure: number): number {
-  return 1.4 + Math.min(exposure, 1) * 2.6;
+function segWeight(exposure: number, darkness: number): number {
+  // Dark paths get a small floor so a quiet dark stretch is still findable.
+  const base = darkness > DARK_AT ? 1.8 : 1.2;
+  return base + Math.min(exposure, 1) * 2.4;
 }
 
 /** Perpendicular distance in metres from a point to a segment. */
@@ -375,8 +406,8 @@ export function DarkZoneMap() {
       if (blockedRef.current.has(i)) {
         L.polyline(line, {
           color: C.blocked,
-          weight: 2,
-          opacity: 0.55,
+          weight: 1.6,
+          opacity: 0.5,
           dashArray: '2 5',
         }).addTo(baseLayer.current);
         continue;
@@ -385,8 +416,8 @@ export function DarkZoneMap() {
       if (tunnelsRef.current.has(i)) {
         L.polyline(line, {
           color: C.tunnel,
-          weight: (focus ? 2 : 0) + 3,
-          opacity: 0.95,
+          weight: (focus ? 2 : 0) + 2.6,
+          opacity: 0.85,
           dashArray: '6 4',
         }).addTo(baseLayer.current);
         continue;
@@ -396,8 +427,8 @@ export function DarkZoneMap() {
       // reserved for the safer route, where it means "take this one".
       L.polyline(line, {
         color: segColor(darkness),
-        weight: (focus ? 1.6 : 0) + segWeight(exposure),
-        opacity: focus ? 1 : 0.9,
+        weight: (focus ? 1.6 : 0) + segWeight(exposure, darkness),
+        opacity: focus ? 1 : segOpacity(darkness),
       }).addTo(baseLayer.current);
     }
   }
