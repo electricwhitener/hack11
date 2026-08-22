@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { routePair, findPlace, type LatLng } from '@/lib/nightsafety';
+import { routePair, findPlace, loadAll, type LatLng } from '@/lib/nightsafety';
 
 /**
  * Plans the shortest/safest pair between two named landmarks or raw points.
@@ -10,6 +10,8 @@ export async function POST(req: Request) {
     from?: string | LatLng;
     to?: string | LatLng;
     alpha?: number;
+    /** Minutes past midnight. Omit for a time-blind plan. */
+    atMinutes?: number | null;
   };
 
   // Landmarks resolve to their exact graph node; raw coordinates get snapped.
@@ -18,6 +20,8 @@ export async function POST(req: Request) {
     if (typeof v === 'string') return findPlace(v)?.node;
     return v;
   };
+
+  await loadAll();
 
   const from = resolve(body.from);
   const to = resolve(body.to);
@@ -29,5 +33,7 @@ export async function POST(req: Request) {
     );
   }
 
-  return NextResponse.json(routePair(from, to, body.alpha ?? 4));
+  return NextResponse.json(
+    routePair(from, to, body.alpha ?? 4, typeof body.atMinutes === 'number' ? body.atMinutes : null),
+  );
 }

@@ -59,8 +59,19 @@ const planSafeRoute = tool({
   inputSchema: z.object({
     from: z.string().describe('Starting place name, e.g. "B3 Block".'),
     to: z.string().describe('Destination place name, e.g. "Central Library" or "zanak".'),
+    atHour: z
+      .number()
+      .min(0)
+      .max(23)
+      .optional()
+      .describe(
+        'Hour of day (0-23) the walk happens. Pass it whenever the user mentions a time — ' +
+          'some paths close at night (the subway shuts at 11pm, the hostel gate at 9:15pm) ' +
+          'and the route changes completely.',
+      ),
+    atMinute: z.number().min(0).max(59).optional().describe('Minutes past the hour, if given.'),
   }),
-  execute: async ({ from, to }) => {
+  execute: async ({ from, to, atHour, atMinute }) => {
     const a = findPlace(from);
     const b = findPlace(to);
     if (!a || !b) {
@@ -69,7 +80,9 @@ const planSafeRoute = tool({
       };
     }
 
-    const r = routePair(a.node, b.node);
+    const atMinutes =
+      typeof atHour === 'number' ? atHour * 60 + (atMinute ?? 0) : null;
+    const r = routePair(a.node, b.node, 4, atMinutes);
     return {
       from: a.name,
       to: b.name,
@@ -82,6 +95,11 @@ const planSafeRoute = tool({
       darkReductionPct: r.darkReductionPct,
       alreadySafest: r.identical,
       unlitStretchesAvoided: r.shortest.darkStretches,
+      closuresOnDirectRoute: r.closures,
+      plannedForTime:
+        atMinutes === null
+          ? 'no particular time'
+          : `${String(Math.floor(atMinutes / 60)).padStart(2, '0')}:${String(atMinutes % 60).padStart(2, '0')}`,
     };
   },
 });

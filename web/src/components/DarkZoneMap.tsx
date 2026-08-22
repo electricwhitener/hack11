@@ -34,9 +34,13 @@ type RouteLeg = {
   darkStretches: { label: string; meters: number }[];
 };
 
+export type ClosureNote = { label: string; note: string; exception?: string };
+
 export type RoutePair = {
   shortest: RouteLeg;
   safest: RouteLeg;
+  closures: ClosureNote[];
+  atMinutes: number | null;
   detourMeters: number;
   detourPct: number;
   darkReductionPct: number;
@@ -70,6 +74,7 @@ const C = {
   muted: '#2C2C31', // off-route, when a walk is being shown
   bulbCore: '#FFE3B0', // the safer route itself
   bulbGlow: '#E8901F',
+  tunnel: '#5EC8D8', // enclosed passage — neither lit nor unlit, a different KIND of path
 } as const;
 
 function segColor(risk: number, darkness: number): string {
@@ -132,6 +137,8 @@ export function DarkZoneMap() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [selected, setSelected] = useState<PathInfo | null>(null);
   const surveyor = useSurveyor();
+  const [atMinutes, setAtMinutes] = useState<number | null>(null);
+  const tunnelsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -168,11 +175,15 @@ export function DarkZoneMap() {
       hoverLayer.current = L.layerGroup().addTo(m);
       routeLayer.current = L.layerGroup().addTo(m);
 
-      const data: { segments: Segment[]; places: Place[]; stats: Stats } = await fetch(
-        '/api/graph',
-      ).then((r) => r.json());
+      const data: {
+        segments: Segment[];
+        places: Place[];
+        stats: Stats;
+        tunnels?: number[];
+      } = await fetch('/api/graph').then((r) => r.json());
       if (cancelled) return;
 
+      tunnelsRef.current = new Set(data.tunnels ?? []);
       segRef.current = data.segments;
       setStats(data.stats);
       paintSegments(data.segments, null);
@@ -336,6 +347,22 @@ export function DarkZoneMap() {
         continue;
       }
 
+      /*
+       * A tunnel is not a dark path, it is a different KIND of path. The
+       * subway underpass is enclosed and artificially lit; colouring it by
+       * darkness said something false about it. Dashed cyan reads as
+       * "structure", not "hazard".
+       */
+      if (tunnelsRef.current.has(i)) {
+        L.polyline(line, {
+          color: C.tunnel,
+          weight: (focus ? 2 : 0) + 3,
+          opacity: 0.95,
+          dashArray: '6 4',
+        }).addTo(baseLayer.current);
+        continue;
+      }
+
       // Flat colour everywhere. Nothing on the network glows — the glow is
       // reserved for the safer route, where it means "take this one".
       L.polyline(line, {
@@ -394,9 +421,10 @@ export function DarkZoneMap() {
   }
 
   async function refreshGraph() {
-    const fresh: { segments: Segment[]; stats: Stats } = await fetch('/api/graph').then((r) =>
-      r.json(),
-    );
+    const fresh: { segments: Segment[]; stats: Stats; tunnels?: number[] } = await fetch(
+      '/api/graph',
+    ).then((r) => r.json());
+    tunnelsRef.current = new Set(fresh.tunnels ?? []);
     segRef.current = fresh.segments;
     setStats(fresh.stats);
     // Repainting clears the glow pane, so any live route must be redrawn.
@@ -503,7 +531,7 @@ export function DarkZoneMap() {
       const p: RoutePair = await fetch('/api/route-plan', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ from, to }),
+        body: JSON.stringify({ from, to, atMinutes }),
       }).then((r) => r.json());
       setPlan(p);
 
@@ -542,6 +570,27 @@ export function DarkZoneMap() {
             <PlaceSelect places={places} value={to} onChange={setTo} />
           </div>
           <div className="mt-2 space-y-2">
+            <select
+              value={atMinutes === null ? '' : String(atMinutes)}
+              onChange={(e) => setAtMinutes(e.target.value === '' ? null : Number(e.target.value))}
+              className="h-9 w-full rounded-md border bg-background px-2 text-sm text-foreground"
+              aria-label="Time of walk"
+            >
+              <option value="">Any time — ignore gate closures</option>
+              {[
+                [20 * 60, '8:00 pm'],
+                [21 * 60, '9:00 pm'],
+                [21 * 60 + 30, '9:30 pm — hostel gate shut'],
+                [22 * 60, '10:00 pm'],
+                [23 * 60, '11:00 pm'],
+                [23 * 60 + 30, '11:30 pm — subway shut too'],
+                [0, 'Midnight'],
+              ].map(([v, label]) => (
+                <option key={String(label)} value={String(v)}>
+                  {label}
+                </option>
+              ))}
+            </select>
             <Button className="w-full" onClick={findRoute} disabled={!ready || loading || from === to}>
               {loading ? 'Routing…' : 'Find the safer walk'}
             </Button>
@@ -607,6 +656,7 @@ export function DarkZoneMap() {
         <Legend color={C.busyDark} label="dark & busy" />
         <Legend color={C.moderate} label="dark, some traffic" />
         <Legend color={C.quietDark} label="dark, quiet" />
+        <Legend color={C.tunnel} label="underpass" dashed />
         {plan ? <Legend color={C.bulbCore} label="safer route" glow /> : null}
         {plan ? <Legend color="#E8ECF4" label="shortest" dashed /> : null}
       </div>

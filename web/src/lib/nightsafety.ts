@@ -243,6 +243,83 @@ function recomputeRisk() {
 recomputeRisk();
 appliedVersion = STORE.version;
 
+/* --------------------------------------------------------- access rules
+ *
+ * When a path can actually be used, and what it physically is.
+ *
+ * Matched on the path label rather than baked into graph.json ON PURPOSE:
+ * regenerating the graph renumbers every segment, and surveys are keyed by
+ * segment index — so a rebuild mid-survey would silently point tonight's
+ * fieldwork at the wrong paths. Rules living here can be edited and shipped
+ * without touching the graph at all.
+ */
+export type AccessRule = {
+  match: RegExp;
+  /** 24h HH:MM. Closed from `closes` until `opens` the next morning. */
+  closes?: string;
+  opens?: string;
+  /** Shown to the walker when a route is affected. */
+  note: string;
+  /** What gets you through anyway, if anything. */
+  exception?: string;
+  /** Rendered as an enclosed passage rather than an unlit path. */
+  tunnel?: boolean;
+};
+
+export const ACCESS_RULES: AccessRule[] = [
+  {
+    match: /subway/i,
+    closes: '23:00',
+    opens: '05:00',
+    note: 'The subway underpass is shut after 11pm — you cannot get onto campus through it.',
+    tunnel: true,
+  },
+  {
+    match: /hostel (entrance|gate)|ghs (main )?road/i,
+    closes: '21:15',
+    opens: '05:00',
+    note: 'The hostel gate closes at 9:15pm. Leaving needs an outpass, and returning without one means the guard calls your parents.',
+    exception: 'outpass',
+  },
+];
+
+function ruleFor(label: string): AccessRule | undefined {
+  return ACCESS_RULES.find((r) => r.match.test(label));
+}
+
+const toMinutes = (hhmm: string) => {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + (m || 0);
+};
+
+/**
+ * Is a rule in force at this time of day?
+ *
+ * Windows wrap midnight — closes 23:00, opens 05:00 means shut from 11pm right
+ * through to 5am, which is exactly the case that matters here.
+ */
+export function isClosedAt(rule: AccessRule | undefined, minutes: number): boolean {
+  if (!rule?.closes || !rule.opens) return false;
+  const c = toMinutes(rule.closes);
+  const o = toMinutes(rule.opens);
+  return c > o ? minutes >= c || minutes < o : minutes >= c && minutes < o;
+}
+
+/** Access facts for one edge at a given time. */
+export function accessFor(e: Edge, minutes: number | null) {
+  const rule = ruleFor(e.label);
+  return {
+    rule,
+    tunnel: Boolean(rule?.tunnel),
+    closed: minutes === null ? false : isClosedAt(rule, minutes),
+  };
+}
+
+/** Every segment index that is a tunnel, so the map can style them apart. */
+export function tunnelSegments(): number[] {
+  return EDGES.filter((e) => ruleFor(e.label)?.tunnel).map((e) => e.idx);
+}
+
 /**
  * Perpendicular distance in metres from a point to a segment.
  *
@@ -708,9 +785,15 @@ function summarise(path: number[]): RouteStats {
   };
 }
 
+export type ClosureNote = { label: string; note: string; exception?: string };
+
 export type RoutePair = {
   shortest: RouteStats;
   safest: RouteStats;
+  /** Closures the walker would hit on the DIRECT route at this time. */
+  closures: ClosureNote[];
+  /** Minutes past midnight the route was planned for, or null for "any time". */
+  atMinutes: number | null;
   /** Extra metres the safer route costs. */
   detourMeters: number;
   detourPct: number;
@@ -726,18 +809,57 @@ export type RoutePair = {
  * At alpha=0 the safest route collapses onto the shortest one. 4 is tuned so a
  * walker will accept a modest detour but not a wild one.
  */
-export function routePair(from: LatLng | number, to: LatLng | number, alpha = 4): RoutePair {
+export function routePair(
+  from: LatLng | number,
+  to: LatLng | number,
+  alpha = 4,
+  atMinutes: number | null = null,
+): RoutePair {
   sync();
   const a = typeof from === 'number' ? from : nearestNode(from);
   const b = typeof to === 'number' ? to : nearestNode(to);
 
-  const shortest = summarise(shortestPath(a, b, (e) => e.length));
-  const safest = summarise(shortestPath(a, b, (e) => e.length * (1 + alpha * e.risk)));
+  /*
+   * A closed gate is not a preference, it is a wall — so it is removed from
+   * consideration entirely rather than penalised. The shortest route ignores
+   * time (that is the route a normal map would give you, and the comparison is
+   * the point); the safest route respects it.
+   */
+  const passable = (e: Edge) => atMinutes === null || !accessFor(e, atMinutes).closed;
+
+  const shortestPathIgnoringTime = shortestPath(a, b, (e) => e.length);
+  const shortest = summarise(shortestPathIgnoringTime);
+
+  let safest = summarise(
+    shortestPath(a, b, (e) => (passable(e) ? e.length * (1 + alpha * e.risk) : Infinity)),
+  );
+  // If honouring the closures disconnects the pair entirely, fall back to the
+  // time-blind route rather than returning nothing — and the closure notes
+  // below still tell the walker what stands in their way.
+  if (safest.path.length === 0) {
+    safest = summarise(shortestPath(a, b, (e) => e.length * (1 + alpha * e.risk)));
+  }
+
+  // What the DIRECT route runs into, which is what the walker needs warning about.
+  const closures: ClosureNote[] = [];
+  if (atMinutes !== null) {
+    const seen = new Set<string>();
+    for (const i of shortest.segments) {
+      const e = EDGES[i];
+      const { rule, closed } = accessFor(e, atMinutes);
+      if (closed && rule && !seen.has(rule.note)) {
+        seen.add(rule.note);
+        closures.push({ label: e.label, note: rule.note, exception: rule.exception });
+      }
+    }
+  }
 
   const detourMeters = safest.meters - shortest.meters;
   return {
     shortest,
     safest,
+    closures,
+    atMinutes,
     detourMeters,
     detourPct: shortest.meters ? Math.round((100 * detourMeters) / shortest.meters) : 0,
     darkReductionPct: shortest.darkMeters
