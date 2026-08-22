@@ -471,7 +471,22 @@ export const ACCESS_RULES: AccessRule[] = [
     note: 'The subway underpass is shut from 11pm. There is no way through it.',
   },
   {
-    match: /university entrance|main gate/i,
+    /*
+     * Carriageways only — NOT every path whose name mentions the entrance.
+     *
+     * `/university entrance/` matched 18 segments, including "Footpath by
+     * University Entrance" and "Walkway by University Entrance": paths that
+     * run PAST the gate without going through it and never leave campus.
+     * Shutting them at 11pm made a whole corner of campus impassable, and
+     * that, not the hostel gate, was what collapsed the late-night walk to
+     * "closed" — the route could reach the hostel gate but not the ground on
+     * the other side of it.
+     *
+     * A shut gate stops you passing THROUGH it. It does not make the pavement
+     * beside it disappear. Crossing between campus and outside is still
+     * governed by PORTALS, which is the right place for it.
+     */
+    match: /^(service )?road by university entrance|main gate/i,
     closes: '23:00',
     opens: '05:00',
     barrier: 'hard',
@@ -479,11 +494,11 @@ export const ACCESS_RULES: AccessRule[] = [
   },
   {
     match: /hostel (entrance|gate)|ghs (main )?road/i,
-    closes: '21:15',
-    opens: '05:00',
+    closes: '21:00',
+    opens: '06:00',
     barrier: 'permission',
     permit: 'outpass',
-    note: 'The hostel gate closes at 9:15pm. Leaving needs an outpass, and returning without one means the guard calls your parents.',
+    note: 'The hostel gate is shut from 9pm until 6am. Getting through it needs an outpass.',
   },
 ];
 
@@ -1105,12 +1120,15 @@ export function zoneOfNode(node: number): Zone {
 
 export type Portal = {
   name: string;
+  /** The walk ENTERS connects[0] when its destination is in that zone. */
   connects: [Zone, Zone];
   closes?: string;
   opens?: string;
   barrier: 'hard' | 'permission';
   permit?: string;
   note: string;
+  /** Used instead of `note` when the walk ends in connects[0]. */
+  enterNote?: string;
 };
 
 /**
@@ -1132,11 +1150,19 @@ export const PORTALS: Portal[] = [
   {
     name: 'Hostel gate',
     connects: ['hostel', 'campus'],
-    closes: '21:15',
-    opens: '05:00',
+    closes: '21:00',
+    opens: '06:00',
     barrier: 'permission',
     permit: 'outpass',
-    note: 'The hostel gate closes at 9:15pm — leaving needs an outpass, and returning without one means the guard calls your parents.',
+    note: 'The hostel gate is shut from 9pm until 6am. Leaving needs an outpass.',
+    /*
+     * The SAME gate, read from the other side. Shown when the walk ends in the
+     * first zone of `connects` — here, when you are heading back INTO the
+     * hostel, which is the case that actually happens at midnight and the one
+     * worth being unambiguous about.
+     */
+    enterNote:
+      'The hostel gate is shut from 9pm until 6am. You need an outpass to get back in — without one the guard will not let you through, and will call your parents.',
   },
   {
     name: 'University entrances',
@@ -1201,6 +1227,20 @@ export function routePair(
   const zFrom = zoneOfNode(a);
   const zTo = zoneOfNode(b);
   const doors = portalsBetween(zFrom, zTo, atMinutes);
+
+  /**
+   * A portal, described from the direction the walker is actually going.
+   *
+   * The hostel gate at midnight means something different depending on which
+   * side of it you are standing: "leaving needs an outpass" is the wrong
+   * sentence entirely for somebody trying to get back into their own block.
+   */
+  const doorNote = (p: Portal): ClosureNote => ({
+    label: p.name,
+    note: (zTo === p.connects[0] && p.enterNote) || p.note,
+    barrier: p.barrier,
+    permit: p.permit,
+  });
 
   const gate = (e: Edge) => {
     if (isBlocked(e.idx)) return BLOCKED_RULE;
@@ -1303,12 +1343,7 @@ export function routePair(
     return finish(
       'closed',
       null,
-      doors.closed.map((p) => ({
-        label: p.name,
-        note: p.note,
-        barrier: p.barrier,
-        permit: p.permit,
-      })),
+      doors.closed.map(doorNote),
     );
   }
 
@@ -1326,12 +1361,7 @@ export function routePair(
     return finish(
       'permission',
       legal,
-      doors.needPermit.map((p) => ({
-        label: p.name,
-        note: p.note,
-        barrier: p.barrier,
-        permit: p.permit,
-      })),
+      doors.needPermit.map(doorNote),
     );
   }
   if (legal) return finish('ok', legal, []);
