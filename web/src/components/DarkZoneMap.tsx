@@ -54,48 +54,46 @@ export type RoutePair = {
   identical: boolean;
 };
 
-const LIT = 0.5; // darkness at or below this reads as "lit"
-
 /** A user reports a stretch they can actually see, not a whole path. */
 const MAX_REPORT_M = 50;
 
 /**
- * Four categories, four clearly different hues.
+ * Colour says ONE thing: how lit the path is.
  *
- * The earlier palette put danger on a single red-to-maroon ramp, and at map
- * scale those two were indistinguishable from each other and muddy against the
- * yellow. So the categories now separate by HUE, not by shade of one colour:
- * yellow / red / violet / slate. Violet for mid-traffic reads as cooler and
- * less urgent than red without being confusable with either neighbour.
+ * It used to encode risk, which folded in modelled foot traffic — so a path's
+ * colour claimed a precision we do not have. Foot traffic is an estimate until
+ * people actually use this, and three shades of "dark but how busy" was noise
+ * on the map rather than information. Lighting is the thing we can observe,
+ * report and survey, so lighting is what gets a colour.
  *
- * Darkness is tested BEFORE risk on purpose. Risk is exposure x darkness, so a
- * busy but well-lit path still scores a middling risk — checking risk first
- * painted the busiest lit paths orange and called them dangerous, which is
- * exactly backwards.
+ * Foot traffic survives as line WEIGHT — a busier path is drawn thicker. That
+ * reads as emphasis rather than a claim, and it degrades honestly: if the
+ * estimate is off, a line is slightly too thick, not the wrong colour.
  */
 const C = {
-  lit: '#F0A63C', // warm amber — lamplight, not school-bus yellow
-  busyDark: '#F04E6E', // rose — dark AND busy
-  moderate: '#8E76D9', // muted violet — dark, some traffic
-  quietDark: '#4B4B52', // neutral grey — dark, nobody walks it
+  lit: '#34D399', // green — lamplight reaches here
+  dim: '#F5A524', // amber — edge of the light, or a lamp across the road
+  dark: '#F04E6E', // red — no light
+  tunnel: '#74A9FF', // enclosed passage: a different KIND of path, not a darkness
+  blocked: '#6B7280', // marked unwalkable on the ground
   muted: '#2C2C31', // off-route, when a walk is being shown
   bulbCore: '#FFE3B0', // the safer route itself
   bulbGlow: '#E8901F',
-  tunnel: '#74A9FF', // enclosed passage — neither lit nor unlit, a different KIND of path
 } as const;
 
-function segColor(risk: number, darkness: number): string {
-  if (darkness <= LIT) return C.lit;
-  if (risk > 0.3) return C.busyDark;
-  if (risk > 0.12) return C.moderate;
-  return C.quietDark;
+/** Thresholds shared with the inspector's wording, so they never disagree. */
+const DIM_AT = 0.35;
+const DARK_AT = 0.6;
+
+function segColor(darkness: number): string {
+  if (darkness <= DIM_AT) return C.lit;
+  if (darkness <= DARK_AT) return C.dim;
+  return C.dark;
 }
 
-function segWeight(risk: number, exposure: number, darkness: number): number {
-  if (darkness <= LIT) return 1.6;
-  if (risk > 0.3) return 3.5;
-  if (risk > 0.12) return 2.8;
-  return exposure > 0.05 ? 2 : 1;
+/** Busier paths draw thicker. The only place foot traffic shows on the map. */
+function segWeight(exposure: number): number {
+  return 1.4 + Math.min(exposure, 1) * 2.6;
 }
 
 /** Perpendicular distance in metres from a point to a segment. */
@@ -376,7 +374,7 @@ export function DarkZoneMap() {
       // surveyor can see their own work and nobody mistakes it for a route.
       if (blockedRef.current.has(i)) {
         L.polyline(line, {
-          color: '#6B7280',
+          color: C.blocked,
           weight: 2,
           opacity: 0.55,
           dashArray: '2 5',
@@ -397,9 +395,9 @@ export function DarkZoneMap() {
       // Flat colour everywhere. Nothing on the network glows — the glow is
       // reserved for the safer route, where it means "take this one".
       L.polyline(line, {
-        color: segColor(risk, darkness),
-        weight: (focus ? 2 : 0) + segWeight(risk, exposure, darkness),
-        opacity: focus ? 1 : 0.85,
+        color: segColor(darkness),
+        weight: (focus ? 1.6 : 0) + segWeight(exposure),
+        opacity: focus ? 1 : 0.9,
       }).addTo(baseLayer.current);
     }
   }
@@ -810,11 +808,10 @@ export function DarkZoneMap() {
 
       <div className="absolute bottom-4 right-16 z-[1000] hidden flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-card/95 px-3 py-2 text-[11px] text-muted-foreground shadow-lg backdrop-blur sm:flex">
         <Legend color={C.lit} label="lit" />
-        <Legend color={C.busyDark} label="dark & busy" />
-        <Legend color={C.moderate} label="dark, some traffic" />
-        <Legend color={C.quietDark} label="dark, quiet" />
+        <Legend color={C.dim} label="dim" />
+        <Legend color={C.dark} label="dark" />
         <Legend color={C.tunnel} label="underpass" dashed />
-        <Legend color="#6B7280" label="not walkable" dashed />
+        <Legend color={C.blocked} label="not walkable" dashed />
         {plan ? <Legend color={C.bulbCore} label="safer route" glow /> : null}
         {plan ? <Legend color="#E8ECF4" label="shortest" dashed /> : null}
       </div>

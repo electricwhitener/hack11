@@ -118,43 +118,91 @@ function midpoint(e: Edge): [number, number] {
   return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
 }
 
-/** For each segment: neighbours within BLEED_DIM_M, and how far away they are. */
+/** Metres from a point to a segment, in local flat coordinates. */
+function pointToSeg(
+  p: [number, number],
+  a: [number, number],
+  b: [number, number],
+): number {
+  const mLat = 111320;
+  const mLng = 111320 * Math.cos((p[0] * Math.PI) / 180);
+  const px = p[1] * mLng;
+  const py = p[0] * mLat;
+  const x1 = a[1] * mLng;
+  const y1 = a[0] * mLat;
+  const x2 = b[1] * mLng;
+  const y2 = b[0] * mLat;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  if (dx === 0 && dy === 0) return Math.hypot(px - x1, py - y1);
+  let t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy);
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
+/**
+ * How far apart two stretches of path actually are.
+ *
+ * Measuring midpoint to midpoint — the obvious shortcut — is wrong for exactly
+ * the case that matters: two sides of the same road are metres apart, but if
+ * their midpoints do not line up they read as distant, and the lamp across the
+ * road never reaches. Sampling both ends and the middle of one segment against
+ * the whole of the other is close enough to true minimum distance here.
+ */
+function segToSeg(i: Edge, j: Edge): number {
+  const ia = G.nodes[i.a];
+  const ib = G.nodes[i.b];
+  const ja = G.nodes[j.a];
+  const jb = G.nodes[j.b];
+  const im = midpoint(i);
+  return Math.min(
+    pointToSeg(ia, ja, jb),
+    pointToSeg(ib, ja, jb),
+    pointToSeg(im, ja, jb),
+    pointToSeg(ja, ia, ib),
+    pointToSeg(jb, ia, ib),
+  );
+}
+
+/**
+ * For each segment: neighbours within BLEED_DIM_M, and how far away they are.
+ *
+ * Built once at module load. Segments are bucketed by BOTH endpoints as well as
+ * their midpoint, because a long segment whose midpoint sits in one bucket can
+ * still run alongside a segment two buckets away.
+ */
 const BLEED_NEIGHBOURS: { idx: number; metres: number }[][] = (() => {
-  const mids = EDGES.map(midpoint);
   const out: { idx: number; metres: number }[][] = EDGES.map(() => []);
-  // Latitude bucketing keeps this near-linear instead of a full n^2 sweep.
-  const cell = BLEED_DIM_M / 111320;
+  const cell = (BLEED_DIM_M * 3) / 111320;
   const buckets = new Map<number, number[]>();
-  for (let i = 0; i < mids.length; i++) {
-    const key = Math.round(mids[i][0] / cell);
-    for (const k of [key - 1, key, key + 1]) {
-      if (!buckets.has(k)) buckets.set(k, []);
-      buckets.get(k)!.push(i);
+
+  const put = (lat: number, i: number) => {
+    const k = Math.round(lat / cell);
+    for (const kk of [k - 1, k, k + 1]) {
+      let arr = buckets.get(kk);
+      if (!arr) buckets.set(kk, (arr = []));
+      arr.push(i);
     }
+  };
+  for (let i = 0; i < EDGES.length; i++) {
+    put(G.nodes[EDGES[i].a][0], i);
+    put(G.nodes[EDGES[i].b][0], i);
+    put(midpoint(EDGES[i])[0], i);
   }
+
   const seen = new Set<number>();
-  for (let i = 0; i < mids.length; i++) {
-    const key = Math.round(mids[i][0] / cell);
+  for (let i = 0; i < EDGES.length; i++) {
     seen.clear();
-    for (const j of buckets.get(key) ?? []) {
-      if (j === i || seen.has(j)) continue;
-      seen.add(j);
-      const d = haversineRaw(mids[i], mids[j]);
-      if (d <= BLEED_DIM_M) out[i].push({ idx: j, metres: d });
+    const k = Math.round(midpoint(EDGES[i])[0] / cell);
+    for (const cand of buckets.get(k) ?? []) {
+      if (cand === i || seen.has(cand)) continue;
+      seen.add(cand);
+      const d = segToSeg(EDGES[i], EDGES[cand]);
+      if (d <= BLEED_DIM_M) out[i].push({ idx: cand, metres: d });
     }
   }
   return out;
 })();
-
-function haversineRaw(a: [number, number], b: [number, number]): number {
-  const R = 6371000;
-  const p1 = (a[0] * Math.PI) / 180;
-  const p2 = (b[0] * Math.PI) / 180;
-  const dp = p2 - p1;
-  const dl = ((b[1] - a[1]) * Math.PI) / 180;
-  const h = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
 
 /**
  * Soften a dark segment toward its nearest lit neighbour.
