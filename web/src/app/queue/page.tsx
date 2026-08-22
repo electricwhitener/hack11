@@ -8,13 +8,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { repairQueue, areaStats } from '@/lib/nightsafety';
+import { repairQueue, areaStats, loadReports } from '@/lib/nightsafety';
 
 // Citizen reports re-rank this list at runtime, so it must not be prerendered
 // at build time — a static page would show the pre-report ordering forever.
 export const dynamic = 'force-dynamic';
 
-export default function QueuePage() {
+export default async function QueuePage() {
+  await loadReports();
   const queue = repairQueue(12);
   const s = areaStats();
   const top5 = queue.slice(0, 5).reduce((a, q) => a + q.benefitPct, 0);

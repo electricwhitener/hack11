@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { spanAt, reportSpan, reportCount, trimSpan } from '@/lib/nightsafety';
+import { spanAt, reportSpan, reportCount, trimSpan, loadReports, persistSpan } from '@/lib/nightsafety';
 
 /**
  * A citizen report: "this stretch is dark".
@@ -21,6 +21,9 @@ export async function POST(req: Request) {
     dark?: boolean;
   };
 
+  // Read-modify-write: start from the shared counts, not this lambda's.
+  await loadReports();
+
   let indices = Array.isArray(span) ? span.filter((n) => Number.isInteger(n)) : undefined;
 
   if (!indices?.length) {
@@ -35,5 +38,7 @@ export async function POST(req: Request) {
   indices = trimSpan(indices);
 
   const result = reportSpan(indices, dark !== false);
+  await persistSpan(indices);
+
   return NextResponse.json({ ...result, totalReports: reportCount() });
 }

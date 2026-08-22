@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { API_KEYS, MODEL_CHAIN, MODEL_ATTEMPTS, MODEL_ID } from '@/lib/ai/provider';
-import { areaStats, meta } from '@/lib/nightsafety';
+import { areaStats, meta, loadReports } from '@/lib/nightsafety';
 import { hasSupabase } from '@/lib/supabase/config';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +14,7 @@ export const dynamic = 'force-dynamic';
  * a prefix, or a length, so it is safe to leave public.
  */
 export async function GET() {
+  await loadReports();
   const s = areaStats();
 
   return NextResponse.json({

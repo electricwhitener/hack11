@@ -10,6 +10,7 @@
  */
 
 import raw from '@/data/graph.json';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, hasSupabase } from '@/lib/supabase/config';
 
 /** [a, b, length_m, exposure, lit, risk, wayId, label, source] */
 type EdgeTuple = [number, number, number, number, number, number, number, string, string];
@@ -90,12 +91,11 @@ for (const e of EDGES) {
 let TOTAL_RISK_M = EDGES.reduce((s, e) => s + e.risk * e.length, 0);
 
 /**
- * Citizen reports, applied on top of the baked graph.
+ * Citizen reports, cached in module memory.
  *
- * Kept in module memory deliberately: a report has to change the map and
- * re-rank the queue immediately, and a hackathon demo does not need it to
- * survive a restart. On serverless this is per-instance — fine for a single
- * demo machine, and the first thing to move to Postgres for a real pilot.
+ * Postgres is the source of truth — see loadReports/persistSpan below. This map
+ * is a per-instance cache so the belief model can stay synchronous; it is
+ * refilled from the database at the start of every request that reads reports.
  */
 type ReportStore = {
   reports: Map<number, { dark: number; lit: number; at: string }>;
@@ -396,6 +396,93 @@ export function reportSpan(indices: number[], dark: boolean): ReportResult {
 
 export function reportCount(): number {
   return REPORTS.size;
+}
+
+/* ------------------------------------------------------------------ storage
+ *
+ * Reports have to outlive one lambda.
+ *
+ * They used to live only in module memory. Vercel runs several instances, each
+ * with its own copy, so a report filed on instance A was invisible on B — one
+ * read in twenty came back with nothing, and a cold start wiped the lot. For
+ * the feature the problem statement actually asks for, that is fatal.
+ *
+ * Postgres is the source of truth; module memory is a per-instance cache that
+ * is refilled at the start of every request that reads reports.
+ */
+
+const REST = `${SUPABASE_URL}/rest/v1/path_reports`;
+const HEADERS = {
+  apikey: SUPABASE_ANON_KEY,
+  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+  'content-type': 'application/json',
+};
+
+/**
+ * Refill this instance's cache from Postgres.
+ *
+ * Every read path calls this first. Failure is deliberately non-fatal: if the
+ * database is unreachable the map still renders from the baked graph, which is
+ * a far better demo failure than a 500.
+ */
+export async function loadReports(): Promise<void> {
+  if (!hasSupabase) return;
+  try {
+    const res = await fetch(`${REST}?select=segment_idx,dark_count,lit_count`, {
+      headers: HEADERS,
+      cache: 'no-store',
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return;
+
+    const rows = (await res.json()) as {
+      segment_idx: number;
+      dark_count: number;
+      lit_count: number;
+    }[];
+
+    REPORTS.clear();
+    for (const r of rows) {
+      REPORTS.set(r.segment_idx, { dark: r.dark_count, lit: r.lit_count, at: '' });
+    }
+    STORE.version += 1;
+    sync();
+  } catch {
+    // Offline or slow: keep serving whatever this instance already has.
+  }
+}
+
+/**
+ * Write a span's new counts back.
+ *
+ * Upserts the totals we just computed rather than issuing an increment, so a
+ * lost write costs one report instead of corrupting a running count. Two people
+ * reporting the same 50 m within the same second could drop one — acceptable
+ * here, and the fix is a Postgres function rather than more client logic.
+ */
+export async function persistSpan(indices: number[]): Promise<void> {
+  if (!hasSupabase || indices.length === 0) return;
+
+  const rows = indices
+    .map((i) => {
+      const r = REPORTS.get(i);
+      return r ? { segment_idx: i, dark_count: r.dark, lit_count: r.lit } : null;
+    })
+    .filter(Boolean);
+
+  if (rows.length === 0) return;
+
+  try {
+    await fetch(REST, {
+      method: 'POST',
+      headers: { ...HEADERS, Prefer: 'resolution=merge-duplicates' },
+      body: JSON.stringify(rows),
+      signal: AbortSignal.timeout(6000),
+    });
+  } catch {
+    // The in-memory update already happened, so this instance stays correct
+    // even if the write failed. It just will not reach the others.
+  }
 }
 
 export const meta = G.meta;
