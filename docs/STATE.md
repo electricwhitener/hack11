@@ -86,6 +86,17 @@ A `hard` door past its hour is shut to everyone; a `permission` door is not.
 into `graph.json`. Regenerating the graph renumbers segments, and surveys are
 keyed by index, so rules in the graph could not be edited mid-survey.
 
+**Placed gates** (added 22 Aug) are the third source of legality, and the only
+one editable from the phone. A checkpoint carries `barrier` / `closes` / `opens`
+/ `permit` and is resolved to the segments it physically controls **by lat/lng
+at load time** — never by segment index, so a graph rebuild re-finds it rather
+than pointing at whatever segment inherited the number.
+
+A barrier with **no hours is shut at every hour, including when no time is
+selected** — that is what "authorised personnel only, always closed" means on
+the ground: a wall, not a schedule. Set it in the point editor under *Can this
+be walked through?*. The note field is prose for walkers and is read by nobody.
+
 ---
 
 ## Data — Postgres (Supabase project `ljuyjziswmocgxslplfk`)
@@ -96,8 +107,23 @@ keyed by index, so rules in the graph could not be edited mid-survey.
 | `path_surveys` | surveyed truth: `lighting` (lit/dim/dark), `traffic`, `blocked`, `note` |
 | `checkpoints` | surveyor-placed points: gates, security, shops |
 
+| `place_overrides` | corrections to imported landmarks: `hidden`, `display_name` |
+
 Migrations applied: `docs/sql/002_survey.sql`, `docs/sql/003_blocked.sql`.
+**Must be run:** `004_gates.sql` (gate hours) and `005_places.sql` (landmark
+corrections). Both degrade rather than fail until then — PostgREST 400s a whole
+select over one unknown column, so reads fall back to the base columns and
+gates simply stay unarmed instead of every checkpoint vanishing from the map.
 **Not yet applied:** a `route_demand` table — see Pending.
+
+**Imported landmarks cannot be deleted at source.** The 32 OSM landmarks live in
+`graph.json`, which is frozen. `place_overrides` overlays hidden/renamed on top,
+keyed by the original name; `findPlace` still resolves the imported name after a
+rename so saved routes do not break. `zoneOfNode` deliberately still reads the
+FULL list — zones decide whether a journey is possible at all, and re-deriving
+them from a shrinking set of landmarks would let hiding a shop silently
+reclassify the ground around it. Hiding also cannot un-bake exposure: the
+modelled trips to that landmark are already in `graph.json`.
 
 Postgres is the source of truth; the in-memory maps are per-instance caches
 refilled by `loadAll()` at the start of every request that reads them.
@@ -145,6 +171,14 @@ One agent message costs roughly 4 requests.
 deliberately off the warm axis so it never competes with the map. Chrome
 *recedes*: cards and header sit darker than the page so the map is the brightest
 thing on screen.
+
+**The lit layer recedes** (22 Aug). 1,500 of 1,883 segments are lit; drawing
+them at 0.85 opacity meant four fifths of the map was bright reassurance and the
+0.2 km of unlit-and-busy had to compete with it. Lit now sits at 0.26 and draws
+thin, and foot traffic thickens a dark path far more than a lit one — a busy lit
+path is the best case on the map. **Problems only** drops everything lit to a
+faint ghost; drawn, not hidden, because 19 red segments on an empty canvas say
+nothing about where they are. That toggle is the map moment for the video.
 
 **Map palette** — one continuous saturated ramp, no mint:
 
