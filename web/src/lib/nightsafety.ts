@@ -132,7 +132,13 @@ const REPORTS = STORE.reports;
  */
 export type SurveyLighting = 'lit' | 'dim' | 'dark';
 export type SurveyTraffic = 'high' | 'medium' | 'low';
-export type Survey = { lighting: SurveyLighting; traffic?: SurveyTraffic | null; note?: string | null };
+export type Survey = {
+  lighting: SurveyLighting | null;
+  traffic?: SurveyTraffic | null;
+  note?: string | null;
+  /** Not walkable at all: a fence, a wall, a lawn OSM calls a path. */
+  blocked?: boolean;
+};
 
 type SurveyStore = { surveys: Map<number, Survey>; version: number };
 const GS = globalThis as typeof globalThis & { __nightlineSurveys?: SurveyStore };
@@ -204,11 +210,16 @@ const PRIOR_STRENGTH: Record<string, number> = {
 };
 
 function priorFor(e: Edge): { alpha: number; beta: number } {
-  const surveyed = SURVEYS.get(e.idx);
+  const sv = SURVEYS.get(e.idx);
+  const surveyed = sv?.lighting ? sv : undefined;
   const s = surveyed ? PRIOR_STRENGTH.survey : (PRIOR_STRENGTH[e.source] ?? 1.5);
   // Centre the prior on the best belief available, but never fully at 0 or 1 —
   // a prior of exactly zero can never be moved by any amount of evidence.
-  const pDark = surveyed ? SURVEY_DARKNESS[surveyed.lighting] : e.lit === 0 ? 0.8 : 0.2;
+  const pDark = surveyed?.lighting
+    ? SURVEY_DARKNESS[surveyed.lighting]
+    : e.lit === 0
+      ? 0.8
+      : 0.2;
   return { alpha: s * pDark, beta: s * (1 - pDark) };
 }
 
@@ -260,8 +271,14 @@ export type AccessRule = {
   opens?: string;
   /** Shown to the walker when a route is affected. */
   note: string;
-  /** What gets you through anyway, if anything. */
-  exception?: string;
+  /**
+   * 'hard'       - shut to everyone. No route may use it.
+   * 'permission' - passable if you hold `permit`. Usable only when nothing
+   *                fully legal exists, and then it must be announced.
+   */
+  barrier: 'hard' | 'permission';
+  /** What gets you through a 'permission' barrier. */
+  permit?: string;
   /** Rendered as an enclosed passage rather than an unlit path. */
   tunnel?: boolean;
 };
@@ -271,17 +288,36 @@ export const ACCESS_RULES: AccessRule[] = [
     match: /subway/i,
     closes: '23:00',
     opens: '05:00',
-    note: 'The subway underpass is shut after 11pm — you cannot get onto campus through it.',
+    barrier: 'hard',
     tunnel: true,
+    note: 'The subway underpass is shut from 11pm. There is no way through it.',
+  },
+  {
+    match: /university entrance|main gate/i,
+    closes: '23:00',
+    opens: '05:00',
+    barrier: 'hard',
+    note: 'The university entrance is shut from 11pm. You cannot enter or leave campus through it.',
   },
   {
     match: /hostel (entrance|gate)|ghs (main )?road/i,
     closes: '21:15',
     opens: '05:00',
+    barrier: 'permission',
+    permit: 'outpass',
     note: 'The hostel gate closes at 9:15pm. Leaving needs an outpass, and returning without one means the guard calls your parents.',
-    exception: 'outpass',
   },
 ];
+
+/** Surveyor-marked impassable. Not a preference — a wall. */
+export function isBlocked(idx: number): boolean {
+  return SURVEYS.get(idx)?.blocked === true;
+}
+
+/** Every segment a surveyor has marked impassable, for the map to grey out. */
+export function blockedSegments(): number[] {
+  return [...SURVEYS.entries()].filter(([, v]) => v.blocked).map(([k]) => k);
+}
 
 function ruleFor(label: string): AccessRule | undefined {
   return ACCESS_RULES.find((r) => r.match.test(label));
@@ -751,6 +787,16 @@ export type RouteStats = {
   darkStretches: { label: string; meters: number }[];
 };
 
+const EMPTY_ROUTE: RouteStats = {
+  path: [],
+  coords: [],
+  segments: [],
+  meters: 0,
+  darkMeters: 0,
+  riskMeters: 0,
+  darkStretches: [],
+};
+
 function summarise(path: number[]): RouteStats {
   let meters = 0;
   let darkMeters = 0;
@@ -785,9 +831,32 @@ function summarise(path: number[]): RouteStats {
   };
 }
 
-export type ClosureNote = { label: string; note: string; exception?: string };
+export type ClosureNote = {
+  label: string;
+  note: string;
+  barrier: 'hard' | 'permission';
+  permit?: string;
+};
+
+/**
+ * What came back from a routing request.
+ *
+ *   ok         - a fully legal route exists.
+ *   permission - the ONLY route runs through a gate you need a permit for.
+ *                Shown, but announced, because a student with an outpass
+ *                really can walk it and one without cannot.
+ *   closed     - nothing legal exists at this hour. We return NO route.
+ *
+ * The third case is the one that matters most. Falling back to a time-blind
+ * route drew a 2.5 km loop around the perimeter through paths that do not
+ * legally exist, and reported "-708% less time in the dark". Telling somebody
+ * they cannot get there is the honest answer, and a safety app that refuses to
+ * draw a line is more trustworthy than one that always draws one.
+ */
+export type RouteStatus = 'ok' | 'permission' | 'closed';
 
 export type RoutePair = {
+  status: RouteStatus;
   shortest: RouteStats;
   safest: RouteStats;
   /** Closures the walker would hit on the DIRECT route at this time. */
@@ -809,6 +878,13 @@ export type RoutePair = {
  * At alpha=0 the safest route collapses onto the shortest one. 4 is tuned so a
  * walker will accept a modest detour but not a wild one.
  */
+/** A surveyor-marked block behaves like a permanently closed hard barrier. */
+const BLOCKED_RULE: AccessRule = {
+  match: /^$/,
+  barrier: 'hard',
+  note: 'This stretch is not walkable — it has been marked as blocked on the ground.',
+};
+
 export function routePair(
   from: LatLng | number,
   to: LatLng | number,
@@ -819,54 +895,105 @@ export function routePair(
   const a = typeof from === 'number' ? from : nearestNode(from);
   const b = typeof to === 'number' ? to : nearestNode(to);
 
-  /*
-   * A closed gate is not a preference, it is a wall — so it is removed from
-   * consideration entirely rather than penalised. The shortest route ignores
-   * time (that is the route a normal map would give you, and the comparison is
-   * the point); the safest route respects it.
-   */
-  const passable = (e: Edge) => atMinutes === null || !accessFor(e, atMinutes).closed;
+  const gate = (e: Edge) => {
+    if (isBlocked(e.idx)) return BLOCKED_RULE;
+    if (atMinutes === null) return null;
+    const { rule, closed } = accessFor(e, atMinutes);
+    return closed && rule ? rule : null;
+  };
 
-  const shortestPathIgnoringTime = shortestPath(a, b, (e) => e.length);
-  const shortest = summarise(shortestPathIgnoringTime);
+  /** Legal for everyone: no closed gate of any kind. */
+  const strict = (e: Edge) => gate(e) === null;
+  /** Legal if you hold the permit: hard barriers still refuse. */
+  const withPermit = (e: Edge) => {
+    const g = gate(e);
+    return g === null || g.barrier === 'permission';
+  };
 
-  let safest = summarise(
-    shortestPath(a, b, (e) => (passable(e) ? e.length * (1 + alpha * e.risk) : Infinity)),
-  );
-  // If honouring the closures disconnects the pair entirely, fall back to the
-  // time-blind route rather than returning nothing — and the closure notes
-  // below still tell the walker what stands in their way.
-  if (safest.path.length === 0) {
-    safest = summarise(shortestPath(a, b, (e) => e.length * (1 + alpha * e.risk)));
-  }
+  const plan = (ok: (e: Edge) => boolean) => {
+    const shortestPathIdx = shortestPath(a, b, (e) => (ok(e) ? e.length : Infinity));
+    if (shortestPathIdx.length === 0) return null;
+    return {
+      shortest: summarise(shortestPathIdx),
+      safest: summarise(
+        shortestPath(a, b, (e) => (ok(e) ? e.length * (1 + alpha * e.risk) : Infinity)),
+      ),
+    };
+  };
 
-  // What the DIRECT route runs into, which is what the walker needs warning about.
-  const closures: ClosureNote[] = [];
-  if (atMinutes !== null) {
+  const notesOn = (segments: number[]): ClosureNote[] => {
     const seen = new Set<string>();
-    for (const i of shortest.segments) {
+    const out: ClosureNote[] = [];
+    for (const i of segments) {
       const e = EDGES[i];
-      const { rule, closed } = accessFor(e, atMinutes);
-      if (closed && rule && !seen.has(rule.note)) {
-        seen.add(rule.note);
-        closures.push({ label: e.label, note: rule.note, exception: rule.exception });
+      const g = gate(e);
+      if (g && !seen.has(g.note)) {
+        seen.add(g.note);
+        out.push({ label: e.label, note: g.note, barrier: g.barrier, permit: g.permit });
       }
     }
+    return out;
+  };
+
+  const finish = (
+    status: RouteStatus,
+    pair: { shortest: RouteStats; safest: RouteStats } | null,
+    closures: ClosureNote[],
+  ): RoutePair => {
+    if (!pair) {
+      return {
+        status,
+        shortest: EMPTY_ROUTE,
+        safest: EMPTY_ROUTE,
+        closures,
+        atMinutes,
+        detourMeters: 0,
+        detourPct: 0,
+        darkReductionPct: 0,
+        identical: true,
+      };
+    }
+    const detourMeters = pair.safest.meters - pair.shortest.meters;
+    return {
+      status,
+      shortest: pair.shortest,
+      safest: pair.safest,
+      closures,
+      atMinutes,
+      detourMeters,
+      detourPct: pair.shortest.meters
+        ? Math.round((100 * detourMeters) / pair.shortest.meters)
+        : 0,
+      // Clamped at zero: the safer route can never be *worse* than the direct
+      // one by construction, and a negative reading here only ever meant the
+      // comparison was against a route that should not have existed.
+      darkReductionPct: pair.shortest.darkMeters
+        ? Math.max(
+            0,
+            Math.round(
+              (100 * (pair.shortest.darkMeters - pair.safest.darkMeters)) /
+                pair.shortest.darkMeters,
+            ),
+          )
+        : 0,
+      identical: pair.shortest.path.join() === pair.safest.path.join(),
+    };
+  };
+
+  // 1. Fully legal.
+  const legal = plan(strict);
+  if (legal) return finish('ok', legal, []);
+
+  // 2. Legal with a permit. Announce exactly which one.
+  const permitted = plan(withPermit);
+  if (permitted) {
+    return finish('permission', permitted, notesOn(permitted.shortest.segments));
   }
 
-  const detourMeters = safest.meters - shortest.meters;
-  return {
-    shortest,
-    safest,
-    closures,
-    atMinutes,
-    detourMeters,
-    detourPct: shortest.meters ? Math.round((100 * detourMeters) / shortest.meters) : 0,
-    darkReductionPct: shortest.darkMeters
-      ? Math.round((100 * (shortest.darkMeters - safest.darkMeters)) / shortest.darkMeters)
-      : 0,
-    identical: shortest.path.join() === safest.path.join(),
-  };
+  // 3. Nothing works. Say so, and name what is in the way — found by routing
+  //    as if time did not exist, then reporting the gates that route crosses.
+  const anyRoute = shortestPath(a, b, (e) => e.length);
+  return finish('closed', null, notesOn(summarise(anyRoute).segments));
 }
 
 export type QueueItem = {
@@ -998,7 +1125,7 @@ export function findPlace(q: string): Place | undefined {
 export async function loadSurveys(): Promise<void> {
   if (!hasSupabase) return;
   try {
-    const res = await fetch(`${SURVEY_REST}?select=segment_idx,lighting,traffic,note`, {
+    const res = await fetch(`${SURVEY_REST}?select=segment_idx,lighting,traffic,note,blocked`, {
       headers: HEADERS,
       cache: 'no-store',
       signal: AbortSignal.timeout(6000),
@@ -1006,13 +1133,19 @@ export async function loadSurveys(): Promise<void> {
     if (!res.ok) return;
     const rows = (await res.json()) as {
       segment_idx: number;
-      lighting: SurveyLighting;
+      lighting: SurveyLighting | null;
       traffic: SurveyTraffic | null;
       note: string | null;
+      blocked?: boolean;
     }[];
     SURVEYS.clear();
     for (const r of rows) {
-      SURVEYS.set(r.segment_idx, { lighting: r.lighting, traffic: r.traffic, note: r.note });
+      SURVEYS.set(r.segment_idx, {
+        lighting: r.lighting,
+        traffic: r.traffic,
+        note: r.note,
+        blocked: Boolean(r.blocked),
+      });
     }
     SSTORE.version += 1;
     sync();
@@ -1030,7 +1163,7 @@ export type SurveyResult = {
   label: string;
   meters: number;
   segments: number;
-  lighting: SurveyLighting;
+  lighting: SurveyLighting | null;
   traffic: SurveyTraffic | null;
   darknessBefore: number;
   darknessAfter: number;
@@ -1046,10 +1179,11 @@ export type SurveyResult = {
  */
 export async function saveSurvey(
   indices: number[],
-  lighting: SurveyLighting,
+  lighting: SurveyLighting | null,
   traffic: SurveyTraffic | null,
   note: string | null,
   surveyor: string | null,
+  blocked = false,
 ): Promise<SurveyResult | null> {
   sync();
   const touched = indices.map((i) => EDGES[i]).filter(Boolean);
@@ -1057,7 +1191,7 @@ export async function saveSurvey(
 
   const before = beliefForSpan(indices)?.darkness ?? 0;
 
-  for (const e of touched) SURVEYS.set(e.idx, { lighting, traffic, note });
+  for (const e of touched) SURVEYS.set(e.idx, { lighting, traffic, note, blocked });
   SSTORE.version += 1;
   recomputeRisk();
   appliedVersion = STORE.version;
@@ -1075,6 +1209,7 @@ export async function saveSurvey(
             traffic,
             note,
             surveyor,
+            blocked,
             updated_at: new Date().toISOString(),
           })),
         ),

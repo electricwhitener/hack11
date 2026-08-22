@@ -21,6 +21,7 @@ export type PathInfo = {
   risk: number;
   lat: number;
   lng: number;
+  blocked?: boolean;
 };
 
 export type SurveyLighting = 'lit' | 'dim' | 'dark';
@@ -88,12 +89,14 @@ export function PathInspector({
   canSurvey,
   onReport,
   onSurvey,
+  onBlock,
   onClose,
 }: {
   info: PathInfo;
   canSurvey: boolean;
   onReport: (span: number[], dark: boolean) => void;
   onSurvey: (span: number[], lighting: SurveyLighting, traffic: SurveyTraffic | null) => void;
+  onBlock: (span: number[], blocked: boolean) => void;
   onClose: () => void;
 }) {
   const [note, setNote] = useState('');
@@ -193,6 +196,24 @@ export function PathInspector({
             placeholder="Note (optional) — e.g. two lamps out"
             className="mt-2.5 h-8 text-xs"
           />
+
+          <div className="mt-3 border-t pt-3">
+            <p className="text-[11px] font-medium text-muted-foreground">
+              Can this stretch be walked at all?
+            </p>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+              Mark a fence, a wall, or a lawn the map thinks is a path. Blocked stretches are
+              removed from routing entirely, which is what stops illegal shortcuts.
+            </p>
+            <Button
+              size="sm"
+              variant={info.blocked ? 'default' : 'outline'}
+              className="mt-2 w-full"
+              onClick={() => onBlock(info.span, !info.blocked)}
+            >
+              {info.blocked ? 'Blocked — tap to unblock' : 'Not walkable — block it'}
+            </Button>
+          </div>
         </div>
       ) : null}
     </div>

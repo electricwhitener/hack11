@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { spanAt, beliefForSpan, MAX_REPORT_METERS, loadAll } from '@/lib/nightsafety';
+import { spanAt, beliefForSpan, MAX_REPORT_METERS, loadAll, isBlocked } from '@/lib/nightsafety';
 
 /**
  * Identify the reportable stretch under a click.
@@ -29,6 +29,7 @@ export async function POST(req: Request) {
     segments: span.indices.length,
     maxMeters: MAX_REPORT_METERS,
     lit: belief.darkness <= 0.5,
+    blocked: span.indices.some(isBlocked),
     darkness: belief.darkness,
     darkReports: belief.darkReports,
     litReports: belief.litReports,

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { edges, nodeLatLng, areaStats, meta, PLACES, loadAll, tunnelSegments } from '@/lib/nightsafety';
+import { edges, nodeLatLng, areaStats, meta, PLACES, loadAll, tunnelSegments, blockedSegments } from '@/lib/nightsafety';
 
 /**
  * Slim drawing payload for the map.
@@ -28,5 +28,6 @@ export async function GET() {
     area: meta.area,
     places: PLACES,
     tunnels: tunnelSegments(),
+    blocked: blockedSegments(),
   });
 }

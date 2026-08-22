@@ -16,14 +16,20 @@ export async function POST(req: Request) {
     lat?: number;
     lng?: number;
     span?: number[];
-    lighting?: 'lit' | 'dim' | 'dark';
+    lighting?: 'lit' | 'dim' | 'dark' | null;
+    blocked?: boolean;
     traffic?: 'high' | 'medium' | 'low' | null;
     note?: string | null;
     surveyor?: string | null;
   };
 
-  if (!body.lighting || !['lit', 'dim', 'dark'].includes(body.lighting)) {
-    return NextResponse.json({ error: 'lighting must be lit, dim or dark.' }, { status: 400 });
+  // A structural block carries no lighting claim, so lighting may be omitted —
+  // but one of the two has to be present or there is nothing to record.
+  if (!body.blocked && (!body.lighting || !['lit', 'dim', 'dark'].includes(body.lighting))) {
+    return NextResponse.json(
+      { error: 'Send lighting (lit/dim/dark), or blocked: true.' },
+      { status: 400 },
+    );
   }
 
   await loadAll();
@@ -39,10 +45,11 @@ export async function POST(req: Request) {
 
   const result = await saveSurvey(
     indices,
-    body.lighting,
+    body.lighting ?? null,
     body.traffic ?? null,
     body.note ?? null,
     body.surveyor ?? null,
+    Boolean(body.blocked),
   );
   if (!result) return NextResponse.json({ error: 'No path there.' }, { status: 404 });
 

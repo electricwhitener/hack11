@@ -35,9 +35,15 @@ type RouteLeg = {
   darkStretches: { label: string; meters: number }[];
 };
 
-export type ClosureNote = { label: string; note: string; exception?: string };
+export type ClosureNote = {
+  label: string;
+  note: string;
+  barrier: 'hard' | 'permission';
+  permit?: string;
+};
 
 export type RoutePair = {
+  status: 'ok' | 'permission' | 'closed';
   shortest: RouteLeg;
   safest: RouteLeg;
   closures: ClosureNote[];
@@ -143,6 +149,7 @@ export function DarkZoneMap() {
   const [draft, setDraft] = useState<Checkpoint | null>(null);
   const cpLayer = useRef<LayerGroup | null>(null);
   const tunnelsRef = useRef<Set<number>>(new Set());
+  const blockedRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -186,10 +193,12 @@ export function DarkZoneMap() {
         places: Place[];
         stats: Stats;
         tunnels?: number[];
+        blocked?: number[];
       } = await fetch('/api/graph').then((r) => r.json());
       if (cancelled) return;
 
       tunnelsRef.current = new Set(data.tunnels ?? []);
+      blockedRef.current = new Set(data.blocked ?? []);
       segRef.current = data.segments;
       setStats(data.stats);
       paintSegments(data.segments, null);
@@ -363,6 +372,18 @@ export function DarkZoneMap() {
        * darkness said something false about it. Dashed cyan reads as
        * "structure", not "hazard".
        */
+      // Marked impassable on the ground: drawn, but visibly struck out, so a
+      // surveyor can see their own work and nobody mistakes it for a route.
+      if (blockedRef.current.has(i)) {
+        L.polyline(line, {
+          color: '#6B7280',
+          weight: 2,
+          opacity: 0.55,
+          dashArray: '2 5',
+        }).addTo(baseLayer.current);
+        continue;
+      }
+
       if (tunnelsRef.current.has(i)) {
         L.polyline(line, {
           color: C.tunnel,
@@ -431,10 +452,10 @@ export function DarkZoneMap() {
   }
 
   async function refreshGraph() {
-    const fresh: { segments: Segment[]; stats: Stats; tunnels?: number[] } = await fetch(
-      '/api/graph',
-    ).then((r) => r.json());
+    const fresh: { segments: Segment[]; stats: Stats; tunnels?: number[]; blocked?: number[] } =
+      await fetch('/api/graph').then((r) => r.json());
     tunnelsRef.current = new Set(fresh.tunnels ?? []);
+    blockedRef.current = new Set(fresh.blocked ?? []);
     segRef.current = fresh.segments;
     setStats(fresh.stats);
     // Repainting clears the glow pane, so any live route must be redrawn.
@@ -514,6 +535,27 @@ export function DarkZoneMap() {
       });
     } catch {
       toast.error('Could not save that survey.');
+    }
+  }
+
+  async function submitBlock(span: number[], blocked: boolean) {
+    try {
+      const res = await fetch('/api/survey', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...surveyor.headers() },
+        body: JSON.stringify({ span, blocked }),
+      });
+      if (!res.ok) {
+        toast.error('Could not save that.');
+        return;
+      }
+      await refreshGraph();
+      setSelected(null);
+      hoverRef.current = null;
+      drawHover(null);
+      toast.success(blocked ? 'Marked as not walkable' : 'Unblocked');
+    } catch {
+      toast.error('Could not save that.');
     }
   }
 
@@ -620,6 +662,16 @@ export function DarkZoneMap() {
       const L = LRef.current;
       if (!L || !map.current) return;
 
+      // Nothing legal exists: show the whole campus and draw no line at all.
+      // Drawing one would be the app insisting on a walk that cannot be made.
+      if (p.status === 'closed') {
+        focusRef.current = null;
+        planRef.current = null;
+        routeLayer.current?.clearLayers();
+        paintSegments(segRef.current, null);
+        return;
+      }
+
       // Focus on both routes together: the comparison is the whole point, so
       // muting the shortest one would hide what the safer route is avoiding.
       // paintSegments clears the glow pane, so it must run before drawRoutes.
@@ -702,6 +754,7 @@ export function DarkZoneMap() {
               canSurvey={surveyor.authorised}
               onReport={submitReport}
               onSurvey={submitSurvey}
+              onBlock={submitBlock}
               onClose={() => setSelected(null)}
             />
           </div>
@@ -761,6 +814,7 @@ export function DarkZoneMap() {
         <Legend color={C.moderate} label="dark, some traffic" />
         <Legend color={C.quietDark} label="dark, quiet" />
         <Legend color={C.tunnel} label="underpass" dashed />
+        <Legend color="#6B7280" label="not walkable" dashed />
         {plan ? <Legend color={C.bulbCore} label="safer route" glow /> : null}
         {plan ? <Legend color="#E8ECF4" label="shortest" dashed /> : null}
       </div>
