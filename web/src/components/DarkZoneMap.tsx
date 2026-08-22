@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { Map as LMap, LayerGroup, Canvas } from 'leaflet';
+import type { Map as LMap, LayerGroup, Canvas, SVG } from 'leaflet';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Flag, MapPin, Sparkles } from 'lucide-react';
@@ -163,6 +163,7 @@ export function DarkZoneMap() {
   const hoverLayer = useRef<LayerGroup | null>(null);
   const LRef = useRef<typeof import('leaflet') | null>(null);
   const glowRenderer = useRef<Canvas | null>(null);
+  const pinRenderer = useRef<SVG | null>(null);
   const segRef = useRef<Segment[]>([]);
   // Leaflet binds handlers once, so they must read modes through refs.
   const modeRef = useRef<MapMode>('none');
@@ -248,6 +249,37 @@ export function DarkZoneMap() {
       gp.style.filter = 'blur(5px)';
       gp.style.pointerEvents = 'none';
       glowRenderer.current = L.canvas({ pane: 'glow' });
+
+      /*
+       * Pins get their own SVG pane ABOVE the segment canvas.
+       *
+       * With preferCanvas every polyline and every pin shared one canvas, and
+       * canvas hit-testing picks the LAST layer drawn under the cursor.
+       * paintSegments clears and re-adds all 1,883 polylines on every repaint —
+       * a route search, the problems toggle, any survey — which appended them
+       * after the pins in draw order and left the pins unclickable. Nothing
+       * about the pins changed; the segments simply overtook them.
+       *
+       * SVG fixes it structurally rather than by z-index luck: each pin is a
+       * real DOM element, so a click lands on the pin where there is a pin and
+       * falls through to the canvas everywhere else. Only ~40 markers render
+       * this way — the 1,883 segments stay on canvas, where they belong.
+       */
+      m.createPane('pins');
+      const pinPane = m.getPane('pins')!;
+      pinPane.style.zIndex = '640'; // above the overlay canvas (400), below popups (700)
+      /*
+       * The PANE must not take clicks, only the pins in it.
+       *
+       * A pane is a plain transparent div stretched over the whole map, and a
+       * transparent div still swallows every click — which would make the
+       * entire map unclickable. Leaflet's own stylesheet re-enables just the
+       * drawn shapes (`.leaflet-pane > svg path.leaflet-interactive`), so
+       * switching the pane off and letting that rule switch the pins back on
+       * is what makes a click land on a pin and pass through everywhere else.
+       */
+      pinPane.style.pointerEvents = 'none';
+      pinRenderer.current = L.svg({ pane: 'pins' });
 
       map.current = m;
       glowLayer.current = L.layerGroup().addTo(m);
@@ -698,6 +730,31 @@ export function DarkZoneMap() {
   }
 
   /**
+   * An invisible, generous tap target centred on a pin.
+   *
+   * RADIUS MUST STAY ABOVE 10. Leaflet treats a circle of radius <= 10 as a
+   * marker and hands the MAP the pin's own coordinate instead of the cursor's
+   * — so a smaller halo would make every tap near a pin inspect the path under
+   * the PIN rather than the one under your finger.
+   */
+  function hitHalo(
+    L: typeof import('leaflet'),
+    at: [number, number],
+    onClick: (ev: L.LeafletMouseEvent) => void,
+  ) {
+    return L.circleMarker(at, {
+      radius: 15,
+      stroke: false,
+      // Not 0: an SVG path resolves `pointer-events: auto` to visiblePainted,
+      // and a fully transparent fill is not reliably hit-testable everywhere.
+      // 0.01 is invisible to the eye and unambiguously painted to the browser.
+      fillOpacity: 0.01,
+      fillColor: '#ffffff',
+      renderer: pinRenderer.current ?? undefined,
+    }).on('click', onClick);
+  }
+
+  /**
    * The imported OpenStreetMap landmarks.
    *
    * In a layer group rather than straight on the map so hiding or renaming one
@@ -710,23 +767,27 @@ export function DarkZoneMap() {
     layer.clearLayers();
 
     for (const p of list) {
+      const open = (ev: L.LeafletMouseEvent) => {
+        // Same Leaflet trap as the checkpoint pins: only L.DomEvent sets the
+        // flag the map checks, so without this the map handler runs too.
+        if (modeRef.current !== 'place' || !surveyorRef.current) return;
+        L.DomEvent.stopPropagation(ev);
+        setDraft(null);
+        setPlaceDraft({ name: p.name, kind: p.kind, renamed: renamedRef.current.has(p.name) });
+      };
+
+      hitHalo(L, [p.at.lat, p.at.lng], open).addTo(layer);
+
       const marker = L.circleMarker([p.at.lat, p.at.lng], {
         radius: p.kind === 'hostel' ? 5 : 4,
         color: p.kind === 'hostel' ? '#93c5fd' : '#cbd5e1',
         fillColor: p.kind === 'hostel' ? '#3b82f6' : '#94a3b8',
         fillOpacity: 0.9,
         weight: 1.5,
+        renderer: pinRenderer.current ?? undefined,
       }).bindTooltip(p.name, { direction: 'top' });
 
-      marker.on('click', (ev: L.LeafletMouseEvent) => {
-        // Same Leaflet trap as the checkpoint pins: only L.DomEvent sets the
-        // flag the map checks, so without this the map handler runs too.
-        L.DomEvent.stopPropagation(ev);
-        if (modeRef.current === 'place' && surveyorRef.current) {
-          setDraft(null);
-          setPlaceDraft({ name: p.name, kind: p.kind, renamed: renamedRef.current.has(p.name) });
-        }
-      });
+      marker.on('click', open);
       marker.addTo(layer);
     }
   }
@@ -792,15 +853,7 @@ export function DarkZoneMap() {
     layer.clearLayers();
 
     for (const c of list) {
-      const marker = L.circleMarker([c.lat, c.lng], {
-        radius: 6,
-        color: '#0b0f14',
-        fillColor: kindColour(c.kind),
-        fillOpacity: 1,
-        weight: 2,
-      }).bindTooltip(`${c.name}${c.note ? ` — ${c.note}` : ''}`, { direction: 'top' });
-
-      marker.on('click', (ev: L.LeafletMouseEvent) => {
+      const open = (ev: L.LeafletMouseEvent) => {
         // MUST be the Leaflet event, not ev.originalEvent. Leaflet decides
         // whether to keep propagating by checking `originalEvent._stopped`, a
         // flag only L.DomEvent sets — calling the native stopPropagation on the
@@ -808,9 +861,30 @@ export function DarkZoneMap() {
         // ran afterwards, and in 'place' mode it replaced the point we had just
         // opened with a blank new one. That is why an existing point could
         // never be edited or deleted, only duplicated.
+        // Claim the click ONLY when it will do something. The halo is a wide
+        // target sitting over the paths, so swallowing every click would make
+        // the ground around each pin un-reportable — exactly the surface a
+        // surveyor taps most.
+        if (modeRef.current !== 'place') return;
         L.DomEvent.stopPropagation(ev);
-        if (modeRef.current === 'place') setDraft(c);
-      });
+        setPlaceDraft(null);
+        setDraft(c);
+      };
+
+      // The hit target is far bigger than the dot. This is tapped with a thumb,
+      // on a phone, on a dark path — a 6px circle is not a target.
+      hitHalo(L, [c.lat, c.lng], open).addTo(layer);
+
+      const marker = L.circleMarker([c.lat, c.lng], {
+        radius: 6,
+        color: '#0b0f14',
+        fillColor: kindColour(c.kind),
+        fillOpacity: 1,
+        weight: 2,
+        renderer: pinRenderer.current ?? undefined,
+      }).bindTooltip(`${c.name}${c.note ? ` — ${c.note}` : ''}`, { direction: 'top' });
+
+      marker.on('click', open);
       marker.addTo(layer);
     }
   }
