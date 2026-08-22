@@ -1,46 +1,62 @@
 {
   "_readme": [
-    "Ground truth that OpenStreetMap does not have. Edit this file by hand, then re-run:",
+    "Ground truth OpenStreetMap does not have. Edit by hand, then re-run:",
     "    cd py-service && python precompute.py",
     "    cd web && npx tsx scripts/facts.ts",
     "",
-    "Every entry is located by a lat/lng point. The pipeline snaps it to the nearest",
-    "street segment and applies the change to that WHOLE path, not just the segment,",
-    "because a locked gate or a dead lamp affects the whole stretch.",
+    "Every entry is located by a lat/lng point, snapped to the nearest path and",
+    "applied to that WHOLE path — a locked gate or a dead lamp affects the stretch,",
+    "not one 8-metre fragment.",
     "",
-    "To get coordinates: open /map, turn on 'Inspect a path', and click. The toast",
-    "gives you a line you can paste straight into this file.",
+    "TO COLLECT COORDINATES: open the site, turn on 'Inspect', click a path. It",
+    "names the path and copies a ready-to-paste JSON line to your clipboard.",
     "",
-    "blocked   - paths that cannot actually be walked (locked gate, wall, staff-only,",
-    "            construction). Removed from the graph entirely BEFORE the exposure",
-    "            model runs, so foot traffic reroutes the way people really do.",
-    "lighting  - surveyed lit/unlit ground truth. Overrides both OSM and the seed.",
-    "landmarks - places OSM is missing. kind is 'hostel' (people start here) or",
-    "            'dest' (people walk to here).",
-    "emergency - security posts, medical centre, wardens. Shown on the map and used",
-    "            to tell a walker what is near their route."
+    "Set \"enabled\": false on any row to keep it in the file without applying it."
   ],
 
-  "blocked": [
-    {
-      "lat": 0,
-      "lng": 0,
-      "note": "EXAMPLE - delete this. Describe why it cannot be walked.",
-      "enabled": false
-    }
+  "_blocked_help": [
+    "Paths nobody can walk: a wall, permanently locked gate, construction, or a",
+    "route that only exists on the map. Removed from the graph BEFORE the exposure",
+    "model runs, so foot traffic reroutes the way people really go."
   ],
+  "blocked": [],
 
-  "lighting": [
-    {
-      "lat": 0,
-      "lng": 0,
-      "lit": false,
-      "note": "EXAMPLE - delete this. Surveyed on foot, date.",
-      "enabled": false
-    }
+  "_restricted_help": [
+    "Paths that exist but are not open to everyone — staff-only service roads,",
+    "the inside of a hostel block you do not live in, faculty parking.",
+    "`who` is free text for the UI. Routing treats these as a heavy penalty",
+    "rather than removing them, because they ARE walkable for some people."
   ],
+  "restricted": [],
 
+  "_timed_help": [
+    "Paths that close after a certain time — the single most campus-specific thing",
+    "here, and the thing no generic map knows. `opens` and `closes` are 24h HH:MM.",
+    "A path with closes 22:00 is unusable on an 11pm walk, which is exactly when",
+    "this app is used.",
+    "Example:",
+    "  { \"lat\": 26.8419, \"lng\": 75.5637, \"opens\": \"05:30\", \"closes\": \"22:00\",",
+    "    \"note\": \"Subway underpass - shutters down after 10pm\" }"
+  ],
+  "timed": [],
+
+  "_lighting_help": [
+    "Surveyed lit/unlit ground truth. Outranks both the OSM tag and our seeded",
+    "estimate, and carries a much stronger prior than a citizen report — somebody",
+    "stood there and looked."
+  ],
+  "lighting": [],
+
+  "_landmarks_help": [
+    "Places OSM is missing. `kind` is 'hostel' (people start here) or 'dest'",
+    "(people walk to here). Adding one changes the exposure model, because it adds",
+    "real trips to the simulation."
+  ],
   "landmarks": [],
 
+  "_emergency_help": [
+    "Security posts, the medical centre, warden offices. Shown on the map and used",
+    "to tell a walker what help is near their route."
+  ],
   "emergency": []
 }

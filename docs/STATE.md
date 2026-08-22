@@ -31,6 +31,30 @@ Remaining: screenshot into `docs/shots/map.png`, then regenerate the deck
 (`npx tsx scripts/facts.ts` then `python build_deck.py`) — its numbers still
 predate the belief model and the 50 m cap.
 
+## Reports are PERSISTED in Postgres (do not revert to memory)
+Table `public.path_reports (segment_idx pk, dark_count, lit_count, updated_at)`
+with permissive RLS. Postgres is the source of truth; the in-memory Map is a
+per-instance cache refilled by `loadReports()` at the start of every request
+that reads reports — which keeps the belief model synchronous.
+
+Why: Vercel runs several lambdas, each with its own module memory. Measured
+before the fix: **1 read in 20 returned zero reports**, and a cold start wiped
+everything. After: **30/30 consistent**, and the queue page agrees.
+
+`persistSpan()` upserts the totals just computed rather than issuing increments,
+so a lost write costs one report instead of corrupting a count. DB failure is
+deliberately non-fatal — the map still renders from the baked graph.
+
+**Any new read of report state must `await loadReports()` first.**
+
+## Mobile: the map subtree MUST stay `isolate`d
+Leaflet paints panes up to z-index 800, so map overlays sit at z-1000+. Without
+`isolate` on the map wrapper in `page.tsx` those compete with the whole page, and
+the agent Sheet — portaled to `<body>` at z-50 — opens UNDERNEATH the map panels.
+On a phone that made the agent unreachable. Also: the mobile planner sheet leaves
+a right-hand gutter so it never covers the Ask FAB, and a tap draws the selection
+highlight because `mousemove` never fires on touch.
+
 ## Auth is OPTIONAL — do not re-add the gate
 `/` used to `redirect('/login')` for signed-out visitors, so anyone opening the
 deployed link hit a signup form before seeing the product. Nothing required it:
