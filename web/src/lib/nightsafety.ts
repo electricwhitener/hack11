@@ -1359,7 +1359,16 @@ export function routePair(
       const g = gate(e);
       if (g && !seen.has(g.note)) {
         seen.add(g.note);
-        out.push({ label: e.label, note: g.note, barrier: g.barrier, permit: g.permit });
+        /*
+         * Name the GATE, not the path it happens to sit on.
+         *
+         * "Footpath by TMA Pai Auditorium is shut" tells a surveyor nothing
+         * about which of their pins did it — and a mis-set barrier is the
+         * likeliest reason a walk comes back closed. The gate's own name is
+         * the thing they can go and edit.
+         */
+        const label = 'name' in g && g.name ? (g.name as string) : e.label;
+        out.push({ label, note: g.note, barrier: g.barrier, permit: g.permit });
       }
     }
     return out;
