@@ -8,11 +8,12 @@ import { ArrowRight } from 'lucide-react';
 import { RouteStats } from './RouteStats';
 import { PathInspector, type PathInfo, type SurveyLighting, type SurveyTraffic } from './PathInspector';
 import { SurveyorBar } from './SurveyorBar';
+import { CheckpointEditor, kindColour, type Checkpoint } from './CheckpointEditor';
 import { useSurveyor } from '@/lib/useSurveyor';
 
 /** [aLat, aLng, bLat, bLng, risk, darkness, exposure, wayId] */
 type Segment = [number, number, number, number, number, number, number, number];
-type MapMode = 'none' | 'select';
+type MapMode = 'none' | 'select' | 'place';
 type Place = { name: string; at: { lat: number; lng: number }; node: number; kind: 'hostel' | 'dest' };
 
 export type Stats = {
@@ -74,7 +75,7 @@ const C = {
   muted: '#2C2C31', // off-route, when a walk is being shown
   bulbCore: '#FFE3B0', // the safer route itself
   bulbGlow: '#E8901F',
-  tunnel: '#5EC8D8', // enclosed passage — neither lit nor unlit, a different KIND of path
+  tunnel: '#74A9FF', // enclosed passage — neither lit nor unlit, a different KIND of path
 } as const;
 
 function segColor(risk: number, darkness: number): string {
@@ -138,6 +139,9 @@ export function DarkZoneMap() {
   const [selected, setSelected] = useState<PathInfo | null>(null);
   const surveyor = useSurveyor();
   const [atMinutes, setAtMinutes] = useState<number | null>(null);
+  const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
+  const [draft, setDraft] = useState<Checkpoint | null>(null);
+  const cpLayer = useRef<LayerGroup | null>(null);
   const tunnelsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
@@ -174,6 +178,8 @@ export function DarkZoneMap() {
       baseLayer.current = L.layerGroup().addTo(m);
       hoverLayer.current = L.layerGroup().addTo(m);
       routeLayer.current = L.layerGroup().addTo(m);
+      cpLayer.current = L.layerGroup().addTo(m);
+      void refreshCheckpoints();
 
       const data: {
         segments: Segment[];
@@ -212,6 +218,10 @@ export function DarkZoneMap() {
       });
 
       m.on('click', (ev: L.LeafletMouseEvent) => {
+        if (modeRef.current === 'place') {
+          setDraft({ name: '', kind: 'entrance', lat: ev.latlng.lat, lng: ev.latlng.lng });
+          return;
+        }
         if (modeRef.current === 'none') return;
         const span = spanAt(ev.latlng.lat, ev.latlng.lng);
         if (!span) return;
@@ -512,8 +522,80 @@ export function DarkZoneMap() {
     setMode(value);
     modeRef.current = value;
     setSelected(null);
+    setDraft(null);
     hoverRef.current = null;
     drawHover(null);
+  }
+
+  async function refreshCheckpoints() {
+    try {
+      const d = await fetch('/api/checkpoints').then((r) => r.json());
+      setCheckpoints(d.checkpoints ?? []);
+      drawCheckpoints(d.checkpoints ?? []);
+    } catch {
+      /* map still works without them */
+    }
+  }
+
+  /** Checkpoints are always visible; only editing them needs surveyor rights. */
+  function drawCheckpoints(list: Checkpoint[]) {
+    const L = LRef.current;
+    const layer = cpLayer.current;
+    if (!L || !layer) return;
+    layer.clearLayers();
+
+    for (const c of list) {
+      const marker = L.circleMarker([c.lat, c.lng], {
+        radius: 6,
+        color: '#0b0f14',
+        fillColor: kindColour(c.kind),
+        fillOpacity: 1,
+        weight: 2,
+      }).bindTooltip(`${c.name}${c.note ? ` — ${c.note}` : ''}`, { direction: 'top' });
+
+      marker.on('click', (ev: L.LeafletMouseEvent) => {
+        ev.originalEvent?.stopPropagation();
+        if (modeRef.current === 'place') setDraft(c);
+      });
+      marker.addTo(layer);
+    }
+  }
+
+  async function saveCheckpoint(c: Checkpoint) {
+    try {
+      const res = await fetch('/api/checkpoints', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...surveyor.headers() },
+        body: JSON.stringify(c),
+      });
+      if (!res.ok) {
+        toast.error('Could not save that point.');
+        return;
+      }
+      setDraft(null);
+      await refreshCheckpoints();
+      toast.success(`${c.name} saved`);
+    } catch {
+      toast.error('Could not save that point.');
+    }
+  }
+
+  async function removeCheckpoint(id: string) {
+    try {
+      const res = await fetch(`/api/checkpoints?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: surveyor.headers(),
+      });
+      if (!res.ok) {
+        toast.error('Could not delete that point.');
+        return;
+      }
+      setDraft(null);
+      await refreshCheckpoints();
+      toast.success('Point deleted');
+    } catch {
+      toast.error('Could not delete that point.');
+    }
   }
 
   function clearRoute() {
@@ -602,6 +684,17 @@ export function DarkZoneMap() {
           </div>
         </div>
 
+        {draft ? (
+          <div className="pointer-events-auto">
+            <CheckpointEditor
+              draft={draft}
+              onSave={saveCheckpoint}
+              onDelete={removeCheckpoint}
+              onCancel={() => setDraft(null)}
+            />
+          </div>
+        ) : null}
+
         {selected ? (
           <div className="panel-in pointer-events-auto">
             <PathInspector
@@ -648,6 +741,17 @@ export function DarkZoneMap() {
           {mode === 'select' ? 'Tap a path' : 'Report a path'}
           {reports > 0 ? ` (${reports})` : ''}
         </Button>
+        {surveyor.authorised ? (
+          <Button
+            size="sm"
+            variant={mode === 'place' ? 'default' : 'secondary'}
+            disabled={!ready}
+            onClick={() => toggleMode('place')}
+          >
+            {mode === 'place' ? 'Tap to place' : 'Map a point'}
+            {checkpoints.length > 0 ? ` (${checkpoints.length})` : ''}
+          </Button>
+        ) : null}
         <SurveyorBar surveyor={surveyor} />
       </div>
 

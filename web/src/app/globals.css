@@ -54,7 +54,9 @@
  * brick; a blue cast fought the amber of the map. Borders are real steps in
  * lightness, never transparency tricks.
  *
- * The accent is amber (hue 58-62) — the lamplight the whole product is about.
+ * The UI accent is teal (hue 195), deliberately OFF the warm axis: amber
+ * belongs to the map, where it means lamplight. An amber UI competed with it
+ * and made the whole product read as "black and yellow".
  */
 :root {
   --background: oklch(0.975 0.003 85);
@@ -63,18 +65,18 @@
   --card-foreground: oklch(0.2 0.008 85);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.2 0.008 85);
-  --primary: oklch(0.62 0.13 58);
-  --primary-foreground: oklch(0.99 0.01 85);
+  --primary: oklch(0.55 0.09 195);
+  --primary-foreground: oklch(0.99 0.005 195);
   --secondary: oklch(0.945 0.005 85);
   --secondary-foreground: oklch(0.3 0.012 85);
   --muted: oklch(0.95 0.004 85);
   --muted-foreground: oklch(0.52 0.012 85);
-  --accent: oklch(0.94 0.02 65);
-  --accent-foreground: oklch(0.34 0.06 58);
+  --accent: oklch(0.94 0.02 195);
+  --accent-foreground: oklch(0.32 0.06 195);
   --destructive: oklch(0.58 0.2 18);
   --border: oklch(0.88 0.006 85);
   --input: oklch(0.9 0.006 85);
-  --ring: oklch(0.68 0.1 58);
+  --ring: oklch(0.62 0.08 195);
   --chart-1: oklch(0.72 0.14 62);
   --chart-2: oklch(0.6 0.18 14);
   --chart-3: oklch(0.58 0.16 300);
@@ -83,12 +85,12 @@
   --radius: 0.7rem;
   --sidebar: oklch(0.955 0.004 85);
   --sidebar-foreground: oklch(0.2 0.008 85);
-  --sidebar-primary: oklch(0.62 0.13 58);
-  --sidebar-primary-foreground: oklch(0.99 0.01 85);
+  --sidebar-primary: oklch(0.55 0.09 195);
+  --sidebar-primary-foreground: oklch(0.99 0.005 195);
   --sidebar-accent: oklch(0.92 0.008 85);
   --sidebar-accent-foreground: oklch(0.26 0.012 85);
   --sidebar-border: oklch(0.88 0.006 85);
-  --sidebar-ring: oklch(0.68 0.1 58);
+  --sidebar-ring: oklch(0.62 0.08 195);
 }
 
 /*
@@ -99,40 +101,40 @@
  * That is the inverse of the usual "cards float lighter" pattern, and it is
  * what stops a map UI looking like a dashboard.
  *
- * The accent is amber (hue 58), a step warmer and deeper than the old yellow.
+ * The accent is teal (hue 195), leaving warm tones exclusively to the map.
  */
 .dark {
-  --background: oklch(0.205 0.004 85);
+  --background: oklch(0.245 0.004 230);
   --foreground: oklch(0.96 0.004 85);
-  --card: oklch(0.168 0.005 85);
+  --card: oklch(0.205 0.005 230);
   --card-foreground: oklch(0.96 0.004 85);
-  --popover: oklch(0.185 0.005 85);
+  --popover: oklch(0.225 0.005 230);
   --popover-foreground: oklch(0.96 0.004 85);
-  --primary: oklch(0.76 0.13 62);
-  --primary-foreground: oklch(0.19 0.03 58);
-  --secondary: oklch(0.26 0.006 85);
+  --primary: oklch(0.74 0.1 195);
+  --primary-foreground: oklch(0.18 0.03 195);
+  --secondary: oklch(0.3 0.006 230);
   --secondary-foreground: oklch(0.95 0.004 85);
-  --muted: oklch(0.245 0.005 85);
+  --muted: oklch(0.285 0.005 230);
   --muted-foreground: oklch(0.69 0.008 85);
-  --accent: oklch(0.3 0.025 62);
-  --accent-foreground: oklch(0.9 0.06 68);
+  --accent: oklch(0.3 0.03 195);
+  --accent-foreground: oklch(0.88 0.07 195);
   --destructive: oklch(0.66 0.18 18);
-  --border: oklch(0.31 0.006 85);
-  --input: oklch(0.34 0.007 85);
-  --ring: oklch(0.68 0.11 62);
+  --border: oklch(0.35 0.007 230);
+  --input: oklch(0.38 0.008 230);
+  --ring: oklch(0.66 0.09 195);
   --chart-1: oklch(0.78 0.13 65);
   --chart-2: oklch(0.66 0.19 14);
   --chart-3: oklch(0.64 0.16 300);
   --chart-4: oklch(0.7 0.09 200);
   --chart-5: oklch(0.6 0.012 85);
-  --sidebar: oklch(0.168 0.005 85);
+  --sidebar: oklch(0.205 0.005 230);
   --sidebar-foreground: oklch(0.95 0.004 85);
-  --sidebar-primary: oklch(0.76 0.13 62);
-  --sidebar-primary-foreground: oklch(0.19 0.03 58);
-  --sidebar-accent: oklch(0.26 0.006 85);
+  --sidebar-primary: oklch(0.74 0.1 195);
+  --sidebar-primary-foreground: oklch(0.18 0.03 195);
+  --sidebar-accent: oklch(0.3 0.006 230);
   --sidebar-accent-foreground: oklch(0.96 0.004 85);
-  --sidebar-border: oklch(0.31 0.006 85);
-  --sidebar-ring: oklch(0.68 0.11 62);
+  --sidebar-border: oklch(0.35 0.007 230);
+  --sidebar-ring: oklch(0.66 0.09 195);
 }
 
 @layer utilities {
@@ -155,8 +157,17 @@
   /* Leaflet paints its own white ground otherwise, which flashes on load and
      looks wrong under a dark basemap in either theme. */
   .leaflet-container {
-    background: oklch(0.185 0.004 85);
+    background: oklch(0.245 0.004 230);
     font-family: inherit;
+  }
+  /*
+   * CARTO's dark basemap is nearly black, which buried the path colours and
+   * made the whole screen read as one dark slab. Lifting the tiles to a mid
+   * grey gives the amber and rose something to sit against, and desaturating
+   * keeps the basemap from competing with them.
+   */
+  .leaflet-tile-pane {
+    filter: brightness(2.1) contrast(0.78) saturate(0.55);
   }
   .leaflet-control-zoom a {
     background: var(--card);
