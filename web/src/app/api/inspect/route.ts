@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { spanAt, beliefForSpan, MAX_REPORT_METERS, loadReports } from '@/lib/nightsafety';
+import { spanAt, beliefForSpan, MAX_REPORT_METERS, loadAll } from '@/lib/nightsafety';
 
 /**
  * Identify the reportable stretch under a click.
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Pass {lat, lng}.' }, { status: 400 });
   }
 
-  await loadReports();
+  await loadAll();
   const span = spanAt({ lat, lng });
   const belief = beliefForSpan(span.indices);
   if (!belief) return NextResponse.json({ error: 'No path there.' }, { status: 404 });

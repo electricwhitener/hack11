@@ -5,11 +5,13 @@ import type { Map as LMap, LayerGroup, Canvas } from 'leaflet';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { RouteStats } from './RouteStats';
-import { PathInspector, type PathInfo } from './PathInspector';
+import { PathInspector, type PathInfo, type SurveyLighting, type SurveyTraffic } from './PathInspector';
+import { SurveyorBar } from './SurveyorBar';
+import { useSurveyor } from '@/lib/useSurveyor';
 
 /** [aLat, aLng, bLat, bLng, risk, darkness, exposure, wayId] */
 type Segment = [number, number, number, number, number, number, number, number];
-type MapMode = 'none' | 'report' | 'inspect';
+type MapMode = 'none' | 'select';
 type Place = { name: string; at: { lat: number; lng: number }; node: number; kind: 'hostel' | 'dest' };
 
 export type Stats = {
@@ -127,6 +129,7 @@ export function DarkZoneMap() {
   const [reports, setReports] = useState(0);
   const [stats, setStats] = useState<Stats | null>(null);
   const [selected, setSelected] = useState<PathInfo | null>(null);
+  const surveyor = useSurveyor();
 
   useEffect(() => {
     let cancelled = false;
@@ -395,9 +398,6 @@ export function DarkZoneMap() {
         body: JSON.stringify({ lat, lng }),
       }).then((r) => r.json());
       setSelected(d);
-      if (modeRef.current === 'inspect') {
-        await navigator.clipboard?.writeText(d.lightingSnippet).catch(() => {});
-      }
     } catch {
       toast.error('Could not identify that path.');
     }
@@ -427,6 +427,40 @@ export function DarkZoneMap() {
       });
     } catch {
       toast.error('Could not file that report.');
+    }
+  }
+
+  async function submitSurvey(
+    span: number[],
+    lighting: SurveyLighting,
+    traffic: SurveyTraffic | null,
+  ) {
+    try {
+      const res = await fetch('/api/survey', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...surveyor.headers() },
+        body: JSON.stringify({ span, lighting, traffic }),
+      });
+      if (!res.ok) {
+        toast.error('Could not save that survey.');
+        return;
+      }
+      const r = await res.json();
+      await refreshGraph();
+      setSelected(null);
+      hoverRef.current = null;
+      drawHover(null);
+
+      const word = lighting === 'dark' ? 'unlit' : lighting === 'dim' ? 'dim' : 'lit';
+      toast.success(`${r.label} · ${r.meters} m marked ${word}`, {
+        description:
+          (traffic ? `Foot traffic set to ${traffic}. ` : '') +
+          (r.queueRank > 0
+            ? `Repair queue #${r.queueRank} — ${r.benefitPct}% of campus risk.`
+            : 'Not enough foot traffic to enter the repair queue.'),
+      });
+    } catch {
+      toast.error('Could not save that survey.');
     }
   }
 
@@ -519,8 +553,9 @@ export function DarkZoneMap() {
           <div className="panel-in pointer-events-auto">
             <PathInspector
               info={selected}
-              mode={mode}
+              canSurvey={surveyor.authorised}
               onReport={submitReport}
+              onSurvey={submitSurvey}
               onClose={() => setSelected(null)}
             />
           </div>
@@ -552,28 +587,17 @@ export function DarkZoneMap() {
         ) : null}
       </div>
 
-      <div className="absolute right-3 top-3 z-[1000] flex gap-2 sm:right-4 sm:top-4">
+      <div className="absolute right-3 top-3 z-[1000] flex flex-col items-end gap-2 sm:right-4 sm:top-4">
         <Button
           size="sm"
-          variant={mode === 'report' ? 'default' : 'secondary'}
+          variant={mode === 'select' ? 'default' : 'secondary'}
           disabled={!ready}
-          onClick={() => toggleMode('report')}
+          onClick={() => toggleMode('select')}
         >
-          <span className="hidden sm:inline">
-            {mode === 'report' ? 'Hover a path, then click' : 'Report a dark path'}
-          </span>
-          <span className="sm:hidden">{mode === 'report' ? 'Tap a path' : 'Report'}</span>
+          {mode === 'select' ? 'Tap a path' : 'Report a path'}
           {reports > 0 ? ` (${reports})` : ''}
         </Button>
-        <Button
-          size="sm"
-          variant={mode === 'inspect' ? 'default' : 'secondary'}
-          disabled={!ready}
-          onClick={() => toggleMode('inspect')}
-          title="Identify a path and copy its coordinates for docs/campus-data.json"
-        >
-          {mode === 'inspect' ? 'Tap a path' : 'Inspect'}
-        </Button>
+        <SurveyorBar surveyor={surveyor} />
       </div>
 
       <div className="absolute bottom-4 right-16 z-[1000] hidden flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-card/95 px-3 py-2 text-[11px] text-muted-foreground shadow-lg backdrop-blur sm:flex">

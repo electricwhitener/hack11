@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { edges, nodeLatLng, areaStats, meta, PLACES, loadReports } from '@/lib/nightsafety';
+import { edges, nodeLatLng, areaStats, meta, PLACES, loadAll } from '@/lib/nightsafety';
 
 /**
  * Slim drawing payload for the map.
@@ -11,7 +11,7 @@ import { edges, nodeLatLng, areaStats, meta, PLACES, loadReports } from '@/lib/n
 export async function GET() {
   // Reports may have been filed against a different lambda, so pull the shared
   // state from Postgres before reading anything derived from it.
-  await loadReports();
+  await loadAll();
   const stats = areaStats();
 
   // wayId travels with each segment so the client can highlight a whole path

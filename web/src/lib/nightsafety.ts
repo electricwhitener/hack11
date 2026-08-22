@@ -52,6 +52,8 @@ export type Edge = {
   length: number;
   /** 0..1 — modelled share of night foot traffic crossing this segment. */
   exposure: number;
+  /** exposure after any surveyor traffic correction. Risk uses THIS. */
+  effExposure: number;
   /** Baked starting belief: 1 = lit, 0 = dark. Never mutated by reports. */
   lit: number;
   /** 0..1 posterior probability the path is unlit. Reports move this. */
@@ -70,6 +72,7 @@ const EDGES: Edge[] = G.edges.map(([a, b, length, exposure, lit, risk, wayId, la
   b,
   length,
   exposure,
+  effExposure: exposure,
   lit,
   darkness: 1 - lit,
   risk,
@@ -115,14 +118,62 @@ const GLOBAL = globalThis as typeof globalThis & { __nightlineReports?: ReportSt
 const STORE: ReportStore = (GLOBAL.__nightlineReports ??= { reports: new Map(), version: 0 });
 const REPORTS = STORE.reports;
 
+/**
+ * SURVEYED GROUND TRUTH.
+ *
+ * The evidence hierarchy, strongest first:
+ *   1. survey   - somebody walked the path at night and looked at it
+ *   2. osm      - a mapper recorded a lighting tag
+ *   3. simulated- our own guess from the road class
+ * with citizen reports layered on top as Bayesian evidence (see beliefFor).
+ *
+ * A survey does not merely nudge the posterior, it replaces the prior AND
+ * raises its strength, so casual reports cannot overturn a checked fact.
+ */
+export type SurveyLighting = 'lit' | 'dim' | 'dark';
+export type SurveyTraffic = 'high' | 'medium' | 'low';
+export type Survey = { lighting: SurveyLighting; traffic?: SurveyTraffic | null; note?: string | null };
+
+type SurveyStore = { surveys: Map<number, Survey>; version: number };
+const GS = globalThis as typeof globalThis & { __nightlineSurveys?: SurveyStore };
+const SSTORE: SurveyStore = (GS.__nightlineSurveys ??= { surveys: new Map(), version: 0 });
+const SURVEYS = SSTORE.surveys;
+
+/** Where a surveyed lighting level puts the darkness prior. */
+const SURVEY_DARKNESS: Record<SurveyLighting, number> = { lit: 0.12, dim: 0.5, dark: 0.9 };
+
+/**
+ * Foot-traffic correction.
+ *
+ * The model derives exposure from the road network, which is right about shape
+ * but blind to things like a shortcut everyone takes through a car park. A
+ * surveyor who can see the actual flow can pin it into a band; leaving traffic
+ * null keeps the computed number, which is the default and the honest case.
+ */
+const TRAFFIC_FLOOR: Record<SurveyTraffic, [number, number]> = {
+  high: [0.45, 1],
+  medium: [0.15, 0.45],
+  low: [0, 0.06],
+};
+
+function effectiveExposure(e: Edge): number {
+  const t = SURVEYS.get(e.idx)?.traffic;
+  if (!t) return e.exposure;
+  const [lo, hi] = TRAFFIC_FLOOR[t];
+  return Math.min(Math.max(e.exposure, lo), hi);
+}
+
 /** Version of STORE this module instance has folded into its EDGES. */
 let appliedVersion = -1;
 
 /** Re-derive risk if another module instance has recorded a report since. */
+let appliedSurveyVersion = -1;
+
 function sync() {
-  if (appliedVersion !== STORE.version) {
+  if (appliedVersion !== STORE.version || appliedSurveyVersion !== SSTORE.version) {
     recomputeRisk();
     appliedVersion = STORE.version;
+    appliedSurveyVersion = SSTORE.version;
   }
 }
 
@@ -153,10 +204,11 @@ const PRIOR_STRENGTH: Record<string, number> = {
 };
 
 function priorFor(e: Edge): { alpha: number; beta: number } {
-  const s = PRIOR_STRENGTH[e.source] ?? 1.5;
-  // Centre the prior on the baked belief, but never fully at 0 or 1 — a prior
-  // of exactly zero can never be moved by any amount of evidence.
-  const pDark = e.lit === 0 ? 0.8 : 0.2;
+  const surveyed = SURVEYS.get(e.idx);
+  const s = surveyed ? PRIOR_STRENGTH.survey : (PRIOR_STRENGTH[e.source] ?? 1.5);
+  // Centre the prior on the best belief available, but never fully at 0 or 1 —
+  // a prior of exactly zero can never be moved by any amount of evidence.
+  const pDark = surveyed ? SURVEY_DARKNESS[surveyed.lighting] : e.lit === 0 ? 0.8 : 0.2;
   return { alpha: s * pDark, beta: s * (1 - pDark) };
 }
 
@@ -180,7 +232,8 @@ export function beliefFor(e: Edge) {
 function recomputeRisk() {
   for (const e of EDGES) {
     e.darkness = beliefFor(e).darkness;
-    e.risk = Number((e.exposure * e.darkness).toFixed(4));
+    e.effExposure = effectiveExposure(e);
+    e.risk = Number((e.effExposure * e.darkness).toFixed(4));
   }
   TOTAL_RISK_M = EDGES.reduce((s, e) => s + e.risk * e.length, 0);
 }
@@ -412,6 +465,8 @@ export function reportCount(): number {
  */
 
 const REST = `${SUPABASE_URL}/rest/v1/path_reports`;
+const SURVEY_REST = `${SUPABASE_URL}/rest/v1/path_surveys`;
+const CHECKPOINT_REST = `${SUPABASE_URL}/rest/v1/checkpoints`;
 const HEADERS = {
   apikey: SUPABASE_ANON_KEY,
   Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
@@ -812,4 +867,188 @@ export function findPlace(q: string): Place | undefined {
     PLACES.find((p) => p.name.toLowerCase().includes(n)) ??
     PLACES.find((p) => n.includes(p.name.toLowerCase()))
   );
+}
+
+
+/* ------------------------------------------------------------ surveys */
+
+/** Refill surveyed ground truth from Postgres. Non-fatal on failure. */
+export async function loadSurveys(): Promise<void> {
+  if (!hasSupabase) return;
+  try {
+    const res = await fetch(`${SURVEY_REST}?select=segment_idx,lighting,traffic,note`, {
+      headers: HEADERS,
+      cache: 'no-store',
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return;
+    const rows = (await res.json()) as {
+      segment_idx: number;
+      lighting: SurveyLighting;
+      traffic: SurveyTraffic | null;
+      note: string | null;
+    }[];
+    SURVEYS.clear();
+    for (const r of rows) {
+      SURVEYS.set(r.segment_idx, { lighting: r.lighting, traffic: r.traffic, note: r.note });
+    }
+    SSTORE.version += 1;
+    sync();
+  } catch {
+    /* keep whatever this instance already has */
+  }
+}
+
+/** Everything a read path needs, in one call. */
+export async function loadAll(): Promise<void> {
+  await Promise.all([loadReports(), loadSurveys()]);
+}
+
+export type SurveyResult = {
+  label: string;
+  meters: number;
+  segments: number;
+  lighting: SurveyLighting;
+  traffic: SurveyTraffic | null;
+  darknessBefore: number;
+  darknessAfter: number;
+  queueRank: number;
+  benefitPct: number;
+};
+
+/**
+ * Record a survey over a span, and write it through to Postgres.
+ *
+ * Unlike a citizen report this REPLACES what we believed rather than adding
+ * evidence to it — that is the whole point of somebody walking the path.
+ */
+export async function saveSurvey(
+  indices: number[],
+  lighting: SurveyLighting,
+  traffic: SurveyTraffic | null,
+  note: string | null,
+  surveyor: string | null,
+): Promise<SurveyResult | null> {
+  sync();
+  const touched = indices.map((i) => EDGES[i]).filter(Boolean);
+  if (touched.length === 0) return null;
+
+  const before = beliefForSpan(indices)?.darkness ?? 0;
+
+  for (const e of touched) SURVEYS.set(e.idx, { lighting, traffic, note });
+  SSTORE.version += 1;
+  recomputeRisk();
+  appliedVersion = STORE.version;
+  appliedSurveyVersion = SSTORE.version;
+
+  if (hasSupabase) {
+    try {
+      await fetch(SURVEY_REST, {
+        method: 'POST',
+        headers: { ...HEADERS, Prefer: 'resolution=merge-duplicates' },
+        body: JSON.stringify(
+          touched.map((e) => ({
+            segment_idx: e.idx,
+            lighting,
+            traffic,
+            note,
+            surveyor,
+            updated_at: new Date().toISOString(),
+          })),
+        ),
+        signal: AbortSignal.timeout(8000),
+      });
+    } catch {
+      /* in-memory update already applied on this instance */
+    }
+  }
+
+  const label = touched[0].label;
+  const queue = repairQueue(500);
+  const idx = queue.findIndex((q) => q.label === label);
+
+  return {
+    label,
+    meters: Math.round(touched.reduce((s, e) => s + e.length, 0)),
+    segments: touched.length,
+    lighting,
+    traffic,
+    darknessBefore: before,
+    darknessAfter: beliefForSpan(indices)?.darkness ?? 0,
+    queueRank: idx >= 0 ? idx + 1 : 0,
+    benefitPct: idx >= 0 ? queue[idx].benefitPct : 0,
+  };
+}
+
+export function surveyCount(): number {
+  return SURVEYS.size;
+}
+
+export function surveyFor(idx: number): Survey | undefined {
+  return SURVEYS.get(idx);
+}
+
+/* -------------------------------------------------------- checkpoints */
+
+export type Checkpoint = {
+  id: string;
+  name: string;
+  kind: string;
+  lat: number;
+  lng: number;
+  note?: string | null;
+};
+
+export async function listCheckpoints(): Promise<Checkpoint[]> {
+  if (!hasSupabase) return [];
+  try {
+    const res = await fetch(`${CHECKPOINT_REST}?select=id,name,kind,lat,lng,note&order=name`, {
+      headers: HEADERS,
+      cache: 'no-store',
+      signal: AbortSignal.timeout(6000),
+    });
+    return res.ok ? ((await res.json()) as Checkpoint[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function upsertCheckpoint(c: Partial<Checkpoint>): Promise<Checkpoint | null> {
+  if (!hasSupabase) return null;
+  const body: Record<string, unknown> = {
+    name: c.name,
+    kind: c.kind ?? 'checkpoint',
+    lat: c.lat,
+    lng: c.lng,
+    note: c.note ?? null,
+    updated_at: new Date().toISOString(),
+  };
+  if (c.id) body.id = c.id;
+  try {
+    const res = await fetch(CHECKPOINT_REST, {
+      method: 'POST',
+      headers: { ...HEADERS, Prefer: 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify([body]),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Checkpoint[];
+    return rows[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteCheckpoint(id: string): Promise<boolean> {
+  if (!hasSupabase) return false;
+  try {
+    const res = await fetch(`${CHECKPOINT_REST}?id=eq.${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: HEADERS,
+      signal: AbortSignal.timeout(6000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }

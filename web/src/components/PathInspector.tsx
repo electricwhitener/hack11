@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export type PathInfo = {
   label: string;
@@ -19,47 +21,92 @@ export type PathInfo = {
   risk: number;
   lat: number;
   lng: number;
-  blockedSnippet: string;
-  lightingSnippet: string;
 };
 
-const SOURCE_LABEL: Record<string, string> = {
-  survey: 'surveyed on foot',
-  osm: 'tagged in OpenStreetMap',
-  simulated: 'estimated from road type',
+export type SurveyLighting = 'lit' | 'dim' | 'dark';
+export type SurveyTraffic = 'high' | 'medium' | 'low';
+
+/** Where the current belief came from, in words a person would use. */
+const ORIGIN: Record<string, string> = {
+  survey: 'Someone walked this and checked',
+  osm: 'From the public map data',
+  simulated: 'Estimated from the type of path',
 };
 
 /**
- * The confirmation step between clicking a path and reporting it.
+ * What we currently think, as a sentence rather than a number.
  *
- * Reporting used to fire on the click itself, which made it easy to hit the
- * wrong path and impossible to tell what you had picked. Showing the path, what
- * we currently believe about it, and how much evidence stands behind that turns
- * a stray click into a deliberate act — and it is where the honest answer to
- * "can't someone just spam this?" becomes visible to the user.
+ * A raw "darkness 0.52" means nothing to somebody standing on a footpath. The
+ * probability is still shown as a bar, but the headline has to be language.
  */
+function verdict(darkness: number): { text: string; tone: string } {
+  if (darkness >= 0.75) return { text: 'Unlit', tone: 'text-red-400' };
+  if (darkness > 0.5) return { text: 'Probably unlit', tone: 'text-amber-400' };
+  if (darkness >= 0.35) return { text: 'Patchy', tone: 'text-amber-400' };
+  return { text: 'Lit', tone: 'text-emerald-400' };
+}
+
+/**
+ * What everyone who has walked here thinks.
+ *
+ * Showing the split rather than a single verdict is the honest presentation:
+ * "3 of 4 say unlit" carries its own uncertainty, where "unlit" hides it.
+ */
+function Consensus({ dark, lit }: { dark: number; lit: number }) {
+  const total = dark + lit;
+  if (total === 0) {
+    return (
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        Nobody has reported this stretch yet. You would be the first.
+      </p>
+    );
+  }
+
+  const agree = Math.max(dark, lit);
+  const majority = dark >= lit ? 'unlit' : 'lit';
+  const split = dark > 0 && lit > 0;
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex h-1.5 overflow-hidden rounded-full bg-background">
+        <div className="bg-amber-500" style={{ width: `${(dark / total) * 100}%` }} />
+        <div className="bg-emerald-500" style={{ width: `${(lit / total) * 100}%` }} />
+      </div>
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        <span className="font-medium text-foreground">
+          {agree} of {total}
+        </span>{' '}
+        {total === 1 ? 'report says' : 'reports say'} {majority}
+        {split ? ' — people disagree here, so more reports would help.' : '.'}
+      </p>
+    </div>
+  );
+}
+
 export function PathInspector({
   info,
-  mode,
+  canSurvey,
   onReport,
+  onSurvey,
   onClose,
 }: {
   info: PathInfo;
-  mode: 'none' | 'report' | 'inspect';
+  canSurvey: boolean;
   onReport: (span: number[], dark: boolean) => void;
+  onSurvey: (span: number[], lighting: SurveyLighting, traffic: SurveyTraffic | null) => void;
   onClose: () => void;
 }) {
+  const [note, setNote] = useState('');
+  const v = verdict(info.darkness);
   const pct = Math.round(info.darkness * 100);
-  const evidence = info.darkReports + info.litReports;
 
   return (
     <div className="rounded-xl border bg-card/95 p-4 shadow-lg backdrop-blur">
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-semibold leading-snug">{info.label}</h3>
+        <div className="min-w-0">
+          <h3 className="truncate text-sm font-semibold leading-snug">{info.label}</h3>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Selected stretch: {info.meters} m
-            <span className="text-muted-foreground/70"> · max {info.maxMeters} m per report</span>
+            {info.meters} m selected · max {info.maxMeters} m at a time
           </p>
         </div>
         <Button size="sm" variant="ghost" onClick={onClose} aria-label="Close">
@@ -67,61 +114,87 @@ export function PathInspector({
         </Button>
       </div>
 
-      <div className="mt-3 space-y-2 rounded-lg bg-muted/50 p-3 text-xs">
+      <div className="mt-3 space-y-2.5 rounded-lg bg-muted/50 p-3">
         <div className="flex items-baseline justify-between">
-          <span className="text-muted-foreground">Believed unlit</span>
-          <span
-            className={`font-semibold tabular-nums ${pct > 50 ? 'text-amber-400' : 'text-emerald-400'}`}
-          >
-            {pct}%
-          </span>
+          <span className={`text-lg font-semibold ${v.tone}`}>{v.text}</span>
+          <span className="text-[11px] text-muted-foreground">{pct}% likely unlit</span>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-background">
-          <div
-            className={pct > 50 ? 'h-full bg-amber-500' : 'h-full bg-emerald-500'}
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-        <div className="flex items-baseline justify-between">
-          <span className="text-muted-foreground">Night foot traffic</span>
-          <span className="font-medium tabular-nums">{info.exposure.toFixed(3)}</span>
-        </div>
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          {evidence === 0
-            ? `No reports yet — ${SOURCE_LABEL[info.source] ?? info.source}.`
-            : `${info.darkReports} dark / ${info.litReports} lit report${evidence > 1 ? 's' : ''} so far, on top of a starting estimate ${SOURCE_LABEL[info.source] ?? info.source}.`}
+        <Consensus dark={info.darkReports} lit={info.litReports} />
+        <p className="text-[11px] text-muted-foreground">
+          {ORIGIN[info.source] ?? info.source} · foot traffic {info.exposure.toFixed(2)}
         </p>
       </div>
 
-      {mode === 'report' ? (
-        <>
-          <p className="mt-3 text-xs font-medium">
-            What is this {info.meters} m stretch like at night?
+      <p className="mt-3 text-xs font-medium">What is this stretch like right now?</p>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <Button size="sm" onClick={() => onReport(info.span, true)}>
+          It&apos;s dark
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => onReport(info.span, false)}>
+          It&apos;s lit
+        </Button>
+      </div>
+      <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+        One report shifts the estimate; two agreeing settle it. Only the {info.meters} m you
+        selected changes.
+      </p>
+
+      {canSurvey ? (
+        <div className="mt-4 rounded-lg border border-primary/30 bg-primary/5 p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+            Surveyor
           </p>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <Button size="sm" onClick={() => onReport(info.span, true)}>
-              It&apos;s dark
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => onReport(info.span, false)}>
-              It&apos;s lit
-            </Button>
+          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+            This overrides the estimate outright, so use it only for what you can see.
+          </p>
+
+          <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+            {(
+              [
+                ['lit', 'Lit', 'bg-yellow-400/15 text-yellow-300 hover:bg-yellow-400/25'],
+                ['dim', 'Dim', 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'],
+                ['dark', 'Unlit', 'bg-rose-500/15 text-rose-300 hover:bg-rose-500/25'],
+              ] as const
+            ).map(([value, label, cls]) => (
+              <button
+                key={value}
+                onClick={() => onSurvey(info.span, value, null)}
+                className={`rounded-md px-2 py-2 text-xs font-medium transition-colors ${cls}`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-            Only the highlighted {info.meters} m is affected — a long path is rarely dark end to
-            end. One report shifts the estimate; it does not settle it. The stretch stays flagged
-            <span className="text-amber-400"> unconfirmed</span> until someone else agrees.
+
+          <p className="mt-3 text-[11px] font-medium text-muted-foreground">
+            …and if the foot traffic looks wrong:
           </p>
-        </>
-      ) : (
-        <div className="mt-3">
-          <p className="text-[11px] text-muted-foreground">
-            Coordinates copied for <code className="text-foreground">docs/campus-data.json</code>:
-          </p>
-          <pre className="mt-1 overflow-x-auto rounded-md bg-muted/50 p-2 text-[10px] leading-relaxed text-muted-foreground">
-            {info.lightingSnippet}
-          </pre>
+          <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+            {(
+              [
+                ['high', 'Busy'],
+                ['medium', 'Some'],
+                ['low', 'Quiet'],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                onClick={() => onSurvey(info.span, info.darkness > 0.5 ? 'dark' : 'lit', value)}
+                className="rounded-md border bg-background px-2 py-1.5 text-[11px] transition-colors hover:bg-secondary"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <Input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Note (optional) — e.g. two lamps out"
+            className="mt-2.5 h-8 text-xs"
+          />
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
