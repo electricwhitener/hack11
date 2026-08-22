@@ -173,7 +173,7 @@
      * basemap is context, and it must never compete with the one line the user
      * is looking for.
      */
-    filter: brightness(1.75) contrast(0.82) saturate(0.35);
+    filter: brightness(1.55) contrast(0.9) saturate(0.25);
   }
   .leaflet-control-zoom a {
     background: var(--card);

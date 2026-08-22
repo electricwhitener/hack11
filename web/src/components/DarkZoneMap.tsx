@@ -72,37 +72,34 @@ const MAX_REPORT_M = 50;
  */
 const C = {
   /*
-   * VISUAL HIERARCHY, not a rainbow.
+   * VIVID, BUT STILL A HIERARCHY.
    *
-   * Roughly 80% of this campus is lit. Painting the majority state in loud
-   * saturated green made the map shout its least useful information — the eye
-   * has nowhere to land. So the ramp runs quiet -> warm -> hot, and lightness
-   * and chroma both climb with danger:
+   * Desaturating the majority state made it recede — and made the map dull.
+   * The hierarchy does not need low chroma, because warm and cool already do
+   * the work: warm hues advance toward the viewer, cool hues fall back. So all
+   * three can be fully saturated and the eye still lands on danger first.
    *
-   *   lit   L .58  C .06   recedes toward the basemap; "nothing to see"
-   *   dim   L .74  C .11   warm, noticeable, not alarming
-   *   dark  L .68  C .20   the only high-chroma colour on the map
+   *   lit   cool spring green, high chroma, held back by opacity and weight
+   *   dim   warm amber, advancing
+   *   dark  hot crimson, highest chroma AND warmest AND thickest — three
+   *         separate cues pointing the same way
    *
-   * Hue also moves 165 -> 75 -> 20, a single continuous sweep round the wheel
-   * rather than three unrelated colours, so the three read as one scale.
-   *
-   * Deliberately NOT a red/green pair at equal saturation: that is the worst
-   * case for deuteranopia and it is what the previous palette was. Here the
-   * safe end is desaturated blue-green and the danger end is a light warm red,
-   * so they separate by lightness and chroma as well as hue.
+   * Hue still sweeps one continuous arc (160 -> 75 -> 5), so the three read as
+   * a scale. Lightness stays roughly level, which keeps the safe end from
+   * looking washed out on a grey basemap.
    */
-  lit: '#5C9084', // muted sea green — the quiet majority
-  dim: '#E3A857', // soft amber — edge of the light
-  dark: '#FF6B81', // warm coral — the only thing that pops
-  tunnel: '#7FA9E8', // periwinkle: a different KIND of path, cool and calm
+  lit: '#2FD8A6', // spring green — vivid, but cool, so it sits back
+  dim: '#FFB020', // amber — warm, steps forward
+  dark: '#FF2D55', // crimson — hottest, most saturated, unmissable
+  tunnel: '#5B9DFF', // clear blue: a different KIND of path
   blocked: '#4A4A52', // near-invisible on purpose; it is not a route
   muted: '#2C2C31', // off-route, when a walk is being shown
-  bulbCore: '#FFE3B0', // the safer route itself
-  bulbGlow: '#E8901F',
+  bulbCore: '#FFE9B8', // the safer route itself
+  bulbGlow: '#FF9E1B',
 } as const;
 
 /** Opacity carries hierarchy too: the common case sits back, danger sits forward. */
-const OPACITY = { lit: 0.62, dim: 0.9, dark: 1 } as const;
+const OPACITY = { lit: 0.78, dim: 0.95, dark: 1 } as const;
 
 /** Thresholds shared with the inspector's wording, so they never disagree. */
 const DIM_AT = 0.35;
@@ -122,9 +119,10 @@ function segOpacity(darkness: number): number {
 
 /** Busier paths draw thicker. The only place foot traffic shows on the map. */
 function segWeight(exposure: number, darkness: number): number {
-  // Dark paths get a small floor so a quiet dark stretch is still findable.
-  const base = darkness > DARK_AT ? 1.8 : 1.2;
-  return base + Math.min(exposure, 1) * 2.4;
+  // Weight is the third cue: dark sits thickest, lit thinnest, regardless of
+  // how busy the path is. A quiet dark stretch still has to be findable.
+  const base = darkness > DARK_AT ? 2.1 : darkness > DIM_AT ? 1.6 : 1.1;
+  return base + Math.min(exposure, 1) * 2.3;
 }
 
 /** Perpendicular distance in metres from a point to a segment. */
