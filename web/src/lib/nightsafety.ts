@@ -90,6 +90,102 @@ for (const e of EDGES) {
   ADJ.get(e.b)!.push({ to: e.a, e });
 }
 
+/* ------------------------------------------------------------ light bleed
+ *
+ * Light does not stop at the kerb.
+ *
+ * A lamp on one side of a road lights the footpath on the other side too, so
+ * treating that footpath as fully unlit overstates the danger — which is
+ * exactly what the B3-to-zanak route was doing, routing around a stretch that
+ * is perfectly walkable because the lamps sit just across the road.
+ *
+ * So darkness falls off with distance from the nearest lit segment rather than
+ * switching at a boundary:
+ *
+ *     within BLEED_FULL_M   treated as lit
+ *     within BLEED_DIM_M    dimly lit, interpolated
+ *     beyond that           genuinely dark
+ *
+ * Neighbours are indexed once at module load. Recomputing them per request
+ * would be 3.5M distance tests on every page view.
+ */
+const BLEED_FULL_M = 3;
+const BLEED_DIM_M = 7;
+
+function midpoint(e: Edge): [number, number] {
+  const a = G.nodes[e.a];
+  const b = G.nodes[e.b];
+  return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+}
+
+/** For each segment: neighbours within BLEED_DIM_M, and how far away they are. */
+const BLEED_NEIGHBOURS: { idx: number; metres: number }[][] = (() => {
+  const mids = EDGES.map(midpoint);
+  const out: { idx: number; metres: number }[][] = EDGES.map(() => []);
+  // Latitude bucketing keeps this near-linear instead of a full n^2 sweep.
+  const cell = BLEED_DIM_M / 111320;
+  const buckets = new Map<number, number[]>();
+  for (let i = 0; i < mids.length; i++) {
+    const key = Math.round(mids[i][0] / cell);
+    for (const k of [key - 1, key, key + 1]) {
+      if (!buckets.has(k)) buckets.set(k, []);
+      buckets.get(k)!.push(i);
+    }
+  }
+  const seen = new Set<number>();
+  for (let i = 0; i < mids.length; i++) {
+    const key = Math.round(mids[i][0] / cell);
+    seen.clear();
+    for (const j of buckets.get(key) ?? []) {
+      if (j === i || seen.has(j)) continue;
+      seen.add(j);
+      const d = haversineRaw(mids[i], mids[j]);
+      if (d <= BLEED_DIM_M) out[i].push({ idx: j, metres: d });
+    }
+  }
+  return out;
+})();
+
+function haversineRaw(a: [number, number], b: [number, number]): number {
+  const R = 6371000;
+  const p1 = (a[0] * Math.PI) / 180;
+  const p2 = (b[0] * Math.PI) / 180;
+  const dp = p2 - p1;
+  const dl = ((b[1] - a[1]) * Math.PI) / 180;
+  const h = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/**
+ * Soften a dark segment toward its nearest lit neighbour.
+ *
+ * Only ever reduces darkness — spillover can make a path safer than the model
+ * thought, never more dangerous. A surveyed segment is left alone: somebody
+ * stood there and looked, which beats any inference about a nearby lamp.
+ */
+function applyLightBleed(raw: number[]): number[] {
+  const out = raw.slice();
+  for (let i = 0; i < EDGES.length; i++) {
+    if (raw[i] <= 0.5) continue;
+    if (SURVEYS.get(i)?.lighting) continue;
+
+    let nearestLit = Infinity;
+    for (const n of BLEED_NEIGHBOURS[i]) {
+      if (raw[n.idx] <= 0.35 && n.metres < nearestLit) nearestLit = n.metres;
+    }
+    if (nearestLit === Infinity) continue;
+
+    if (nearestLit <= BLEED_FULL_M) {
+      out[i] = Math.min(raw[i], 0.3);
+    } else if (nearestLit <= BLEED_DIM_M) {
+      // Linear falloff across the dim band, floored at "dim" not "lit".
+      const t = (nearestLit - BLEED_FULL_M) / (BLEED_DIM_M - BLEED_FULL_M);
+      out[i] = Math.min(raw[i], 0.3 + t * 0.3);
+    }
+  }
+  return out;
+}
+
 /** Total risk-metres across the whole area — the denominator for "% of risk removed". */
 let TOTAL_RISK_M = EDGES.reduce((s, e) => s + e.risk * e.length, 0);
 
@@ -241,8 +337,11 @@ export function beliefFor(e: Edge) {
 }
 
 function recomputeRisk() {
-  for (const e of EDGES) {
-    e.darkness = beliefFor(e).darkness;
+  const raw = EDGES.map((e) => beliefFor(e).darkness);
+  const bled = applyLightBleed(raw);
+  for (let i = 0; i < EDGES.length; i++) {
+    const e = EDGES[i];
+    e.darkness = Number(bled[i].toFixed(4));
     e.effExposure = effectiveExposure(e);
     e.risk = Number((e.effExposure * e.darkness).toFixed(4));
   }
@@ -878,6 +977,118 @@ export type RoutePair = {
  * At alpha=0 the safest route collapses onto the shortest one. 4 is tuned so a
  * walker will accept a modest detour but not a wild one.
  */
+/* ------------------------------------------------------------ zones
+ *
+ * The campus is not one connected space, it is three, joined by a countable
+ * number of doors.
+ *
+ *   hostel  <-> campus    the subway underpass, and the hostel gate
+ *   campus  <-> outside   the university entrances
+ *
+ * Modelling it this way is what makes "closed" provable rather than emergent.
+ * Relying on the road graph alone means the router keeps finding a way round
+ * through perimeter geometry OpenStreetMap happens to contain — no matter how
+ * many gates are shut. If every door between two zones is locked, the journey
+ * is impossible, and that can be decided before any routing happens.
+ */
+export type Zone = 'hostel' | 'campus' | 'outside';
+
+const ZONE_PATTERNS: { match: RegExp; zone: Zone }[] = [
+  { match: /^(b\d|g\d)\b|hostel|ghs|quess|bluedove|old mess/i, zone: 'hostel' },
+];
+
+export function zoneOfName(name: string): Zone {
+  return ZONE_PATTERNS.find((z) => z.match.test(name))?.zone ?? 'campus';
+}
+
+/** Zone of a graph node, taken from the landmark nearest to it. */
+export function zoneOfNode(node: number): Zone {
+  let best: (typeof PLACES)[number] | undefined;
+  let bd = Infinity;
+  const p = nodeLatLng(node);
+  for (const place of PLACES) {
+    const d = (place.at.lat - p.lat) ** 2 + (place.at.lng - p.lng) ** 2;
+    if (d < bd) {
+      bd = d;
+      best = place;
+    }
+  }
+  return best ? zoneOfName(best.name) : 'campus';
+}
+
+export type Portal = {
+  name: string;
+  connects: [Zone, Zone];
+  closes?: string;
+  opens?: string;
+  barrier: 'hard' | 'permission';
+  permit?: string;
+  note: string;
+};
+
+/**
+ * Every door between zones.
+ *
+ * The three university entrances share one rule, so they are one entry — what
+ * matters is that when 11pm passes, ALL of them shut and campus becomes
+ * unreachable from outside. Add an entrance here only if its hours differ.
+ */
+export const PORTALS: Portal[] = [
+  {
+    name: 'Subway underpass',
+    connects: ['hostel', 'campus'],
+    closes: '23:00',
+    opens: '05:00',
+    barrier: 'hard',
+    note: 'The subway underpass is shut from 11pm.',
+  },
+  {
+    name: 'Hostel gate',
+    connects: ['hostel', 'campus'],
+    closes: '21:15',
+    opens: '05:00',
+    barrier: 'permission',
+    permit: 'outpass',
+    note: 'The hostel gate closes at 9:15pm — leaving needs an outpass, and returning without one means the guard calls your parents.',
+  },
+  {
+    name: 'University entrances',
+    connects: ['campus', 'outside'],
+    closes: '23:00',
+    opens: '05:00',
+    barrier: 'hard',
+    note: 'All three university entrances shut at 11pm. There is no way on or off campus until 5am.',
+  },
+];
+
+const joins = (p: Portal, a: Zone, b: Zone) =>
+  (p.connects[0] === a && p.connects[1] === b) || (p.connects[0] === b && p.connects[1] === a);
+
+/**
+ * Which doors between two zones are usable at a given time.
+ *
+ * Returns null when the zones are the same — no door needed.
+ */
+export function portalsBetween(a: Zone, b: Zone, minutes: number | null) {
+  if (a === b) return null;
+  const all = PORTALS.filter((p) => joins(p, a, b));
+  const shut = (p: Portal) =>
+    minutes !== null && isClosedAt({ match: /x/, barrier: p.barrier, note: '', closes: p.closes, opens: p.opens }, minutes);
+
+  /*
+   * Past its closing time, a HARD door is simply shut. A PERMISSION door is
+   * not: a student with an outpass really can walk through the hostel gate at
+   * half past eleven. Collapsing the two was making journeys look impossible
+   * when they were merely gated.
+   */
+  return {
+    all,
+    open: all.filter((p) => !shut(p)),
+    needPermit: all.filter((p) => shut(p) && p.barrier === 'permission'),
+    closed: all.filter((p) => shut(p) && p.barrier === 'hard'),
+  };
+}
+
 /** A surveyor-marked block behaves like a permanently closed hard barrier. */
 const BLOCKED_RULE: AccessRule = {
   match: /^$/,
@@ -894,6 +1105,15 @@ export function routePair(
   sync();
   const a = typeof from === 'number' ? from : nearestNode(from);
   const b = typeof to === 'number' ? to : nearestNode(to);
+
+  /*
+   * Decide zone reachability FIRST. If every door between the two zones is
+   * locked, no amount of clever routing changes that, and searching the graph
+   * would only surface a perimeter path that is not really a path.
+   */
+  const zFrom = zoneOfNode(a);
+  const zTo = zoneOfNode(b);
+  const doors = portalsBetween(zFrom, zTo, atMinutes);
 
   const gate = (e: Edge) => {
     if (isBlocked(e.idx)) return BLOCKED_RULE;
@@ -980,8 +1200,42 @@ export function routePair(
     };
   };
 
+  // 0. Zone-level impossibility, decided without touching the graph.
+  if (doors && doors.open.length === 0 && doors.needPermit.length === 0) {
+    return finish(
+      'closed',
+      null,
+      doors.closed.map((p) => ({
+        label: p.name,
+        note: p.note,
+        barrier: p.barrier,
+        permit: p.permit,
+      })),
+    );
+  }
+
   // 1. Fully legal.
   const legal = plan(strict);
+
+  /*
+   * Order matters here. If every open door between the zones needs a permit,
+   * a route the graph calls "legal" is perimeter geometry rather than a way
+   * in — so the permit has to be announced BEFORE we accept that route.
+   */
+  if (doors && doors.open.length === 0 && doors.needPermit.length > 0 && legal) {
+    // The graph found a route, but the only real door needs a permit — the
+    // "legal" path is perimeter geometry, not a way in. Announce the permit.
+    return finish(
+      'permission',
+      legal,
+      doors.needPermit.map((p) => ({
+        label: p.name,
+        note: p.note,
+        barrier: p.barrier,
+        permit: p.permit,
+      })),
+    );
+  }
   if (legal) return finish('ok', legal, []);
 
   // 2. Legal with a permit. Announce exactly which one.
