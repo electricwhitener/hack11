@@ -184,6 +184,22 @@ Reports are capped at **50 m** per action — a long path is rarely dark end to
 end. `spanAt()` exists in both `nightsafety.ts` and `DarkZoneMap.tsx` and the
 two MUST stay in step; the client sends the exact indices it highlighted.
 
+**Correcting a mistake made in the field** (fixed 22 Aug, after the first pass
+found none of it worked):
+- **A point** — in *Map a point* mode, tap the pin itself. Edit or delete it,
+  delete asks twice. Tapping the pin used to open a blank *New point* form
+  instead, because the marker's own click was immediately overwritten by the
+  map's; there was no way to reach delete at all.
+- **A path** — *Not walkable → tap to unblock* now works; it returned 400 every
+  single time. Fixing lighting, traffic, a note or a block no longer wipes the
+  others: `/api/survey` takes a **patch**, and only what you send is written.
+- **Withdraw a survey** — *Undo this survey* in the inspector, or
+  `DELETE /api/survey?span=…`. Overwriting a wrong survey with a different value
+  still reads as prior-strength-8 ground truth; retracting is the honest fix.
+
+`npx tsx scripts/survey-check.ts` drives every surveyor endpoint against a fake
+Postgres — no network, safe to run mid-survey. Run it after touching any of this.
+
 ---
 
 ## Current figures (regenerate, never retype)

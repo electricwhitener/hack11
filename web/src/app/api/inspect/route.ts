@@ -35,6 +35,7 @@ export async function POST(req: Request) {
     litReports: belief.litReports,
     confidence: belief.confidence,
     source: belief.source,
+    surveyed: belief.surveyed,
     exposure: belief.exposure,
     risk: Number((belief.exposure * belief.darkness).toFixed(4)),
     lat: Number(lat.toFixed(5)),

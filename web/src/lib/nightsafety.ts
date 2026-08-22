@@ -11,6 +11,7 @@
 
 import raw from '@/data/graph.json';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, hasSupabase } from '@/lib/supabase/config';
+import { normaliseKind } from '@/lib/checkpointKinds';
 
 /** [a, b, length_m, exposure, lit, risk, wayId, label, source] */
 type EdgeTuple = [number, number, number, number, number, number, number, string, string];
@@ -618,7 +619,15 @@ export function beliefForSpan(indices: number[]) {
     ),
     meters: Math.round(meters),
     label: es[0].label,
-    source: es[0].source,
+    /*
+     * `e.source` is the value baked into graph.json and is never rewritten, so
+     * reporting it raw told a surveyor "from the public map data" about a path
+     * they had just walked and recorded themselves — and made the 'survey'
+     * origin string unreachable. A survey outranks whatever was baked.
+     */
+    source: es.some((e) => SURVEYS.get(e.idx)?.lighting) ? 'survey' : es[0].source,
+    /** Anything recorded here at all — lighting, traffic, note or a block. */
+    surveyed: es.some((e) => SURVEYS.has(e.idx)),
   };
 }
 
@@ -1478,14 +1487,24 @@ export type SurveyResult = {
  *
  * Unlike a citizen report this REPLACES what we believed rather than adding
  * evidence to it — that is the whole point of somebody walking the path.
+ *
+ * A PATCH, NOT A ROW. An absent field keeps whatever is already recorded; only
+ * a field that is present is written. Blocking a path used to arrive as a
+ * survey carrying no lighting, which wrote `lighting: null` over ground truth
+ * somebody had walked out and collected — so marking a fence quietly deleted
+ * the survey of the path beside it. Pass `null` explicitly to clear a field.
  */
+export type SurveyPatch = {
+  lighting?: SurveyLighting | null;
+  traffic?: SurveyTraffic | null;
+  note?: string | null;
+  blocked?: boolean;
+};
+
 export async function saveSurvey(
   indices: number[],
-  lighting: SurveyLighting | null,
-  traffic: SurveyTraffic | null,
-  note: string | null,
-  surveyor: string | null,
-  blocked = false,
+  patch: SurveyPatch,
+  surveyor: string | null = null,
 ): Promise<SurveyResult | null> {
   sync();
   const touched = indices.map((i) => EDGES[i]).filter(Boolean);
@@ -1493,7 +1512,17 @@ export async function saveSurvey(
 
   const before = beliefForSpan(indices)?.darkness ?? 0;
 
-  for (const e of touched) SURVEYS.set(e.idx, { lighting, traffic, note, blocked });
+  const merge = (prev: Survey | undefined): Survey => ({
+    lighting: patch.lighting !== undefined ? patch.lighting : (prev?.lighting ?? null),
+    traffic: patch.traffic !== undefined ? patch.traffic : (prev?.traffic ?? null),
+    note: patch.note !== undefined ? patch.note : (prev?.note ?? null),
+    blocked: patch.blocked !== undefined ? patch.blocked : (prev?.blocked ?? false),
+  });
+
+  // Each segment merges against its OWN previous value: a span can straddle a
+  // stretch that was surveyed and one that was not.
+  const merged = new Map(touched.map((e) => [e.idx, merge(SURVEYS.get(e.idx))]));
+  for (const e of touched) SURVEYS.set(e.idx, merged.get(e.idx)!);
   SSTORE.version += 1;
   recomputeRisk();
   appliedVersion = STORE.version;
@@ -1507,11 +1536,11 @@ export async function saveSurvey(
         body: JSON.stringify(
           touched.map((e) => ({
             segment_idx: e.idx,
-            lighting,
-            traffic,
-            note,
+            // The merged value, not the patch — merge-duplicates overwrites
+            // every column it is given, so anything omitted here would be
+            // nulled in Postgres even though it survived in memory.
+            ...merged.get(e.idx)!,
             surveyor,
-            blocked,
             updated_at: new Date().toISOString(),
           })),
         ),
@@ -1526,17 +1555,61 @@ export async function saveSurvey(
   const queue = repairQueue(500);
   const idx = queue.findIndex((q) => q.label === label);
 
+  const settled = merged.get(touched[0].idx)!;
   return {
     label,
     meters: Math.round(touched.reduce((s, e) => s + e.length, 0)),
     segments: touched.length,
-    lighting,
-    traffic,
+    lighting: settled.lighting,
+    traffic: settled.traffic ?? null,
     darknessBefore: before,
     darknessAfter: beliefForSpan(indices)?.darkness ?? 0,
     queueRank: idx >= 0 ? idx + 1 : 0,
     benefitPct: idx >= 0 ? queue[idx].benefitPct : 0,
   };
+}
+
+/**
+ * Remove the survey over a span entirely, returning those segments to whatever
+ * the model and OSM believed before anybody walked them.
+ *
+ * A surveyor working in the dark taps the wrong stretch, and until this existed
+ * the only correction was to overwrite it with a different claim — which still
+ * carries survey-strength prior 8 and still reads as "someone stood here and
+ * checked". Withdrawing a mistake has to be possible, or the strongest evidence
+ * in the model is the one thing that cannot be taken back.
+ */
+export async function clearSurvey(indices: number[]): Promise<{ cleared: number; label: string } | null> {
+  sync();
+  const touched = indices.map((i) => EDGES[i]).filter(Boolean);
+  if (touched.length === 0) return null;
+
+  const present = touched.filter((e) => SURVEYS.has(e.idx));
+  for (const e of touched) SURVEYS.delete(e.idx);
+  SSTORE.version += 1;
+  recomputeRisk();
+  appliedVersion = STORE.version;
+  appliedSurveyVersion = SSTORE.version;
+
+  // Delete every requested index, not merely the ones this lambda had cached.
+  // The two agree only while loadAll() has just succeeded; if that read failed
+  // or timed out, gating on the cache would skip the write and report a
+  // withdrawal that Postgres never heard about — and the next request would
+  // load the survey straight back in.
+  if (hasSupabase) {
+    try {
+      const list = touched.map((e) => e.idx).join(',');
+      await fetch(`${SURVEY_REST}?segment_idx=in.(${list})`, {
+        method: 'DELETE',
+        headers: HEADERS,
+        signal: AbortSignal.timeout(8000),
+      });
+    } catch {
+      /* in-memory removal already applied on this instance */
+    }
+  }
+
+  return { cleared: present.length, label: touched[0].label };
 }
 
 export function surveyCount(): number {
@@ -1566,7 +1639,12 @@ export async function listCheckpoints(): Promise<Checkpoint[]> {
       cache: 'no-store',
       signal: AbortSignal.timeout(6000),
     });
-    return res.ok ? ((await res.json()) as Checkpoint[]) : [];
+    if (!res.ok) return [];
+    const rows = (await res.json()) as Checkpoint[];
+    // Rows written before the gate rework carry kinds the editor cannot render
+    // — they came back grey with no button selected and no way to tell why.
+    // Normalising on read fixes them on screen without a migration.
+    return rows.map((c) => ({ ...c, kind: normaliseKind(c.kind) }));
   } catch {
     return [];
   }
@@ -1576,7 +1654,7 @@ export async function upsertCheckpoint(c: Partial<Checkpoint>): Promise<Checkpoi
   if (!hasSupabase) return null;
   const body: Record<string, unknown> = {
     name: c.name,
-    kind: c.kind ?? 'checkpoint',
+    kind: normaliseKind(c.kind),
     lat: c.lat,
     lng: c.lng,
     note: c.note ?? null,
@@ -1601,12 +1679,17 @@ export async function upsertCheckpoint(c: Partial<Checkpoint>): Promise<Checkpoi
 export async function deleteCheckpoint(id: string): Promise<boolean> {
   if (!hasSupabase) return false;
   try {
+    // PostgREST answers 204 even when the filter matched nothing, so asking
+    // for the deleted rows back is the only way to tell "gone" from "was never
+    // there" — otherwise the UI reports success and the pin stays put.
     const res = await fetch(`${CHECKPOINT_REST}?id=eq.${encodeURIComponent(id)}`, {
       method: 'DELETE',
-      headers: HEADERS,
+      headers: { ...HEADERS, Prefer: 'return=representation' },
       signal: AbortSignal.timeout(6000),
     });
-    return res.ok;
+    if (!res.ok) return false;
+    const rows = (await res.json()) as unknown[];
+    return Array.isArray(rows) && rows.length > 0;
   } catch {
     return false;
   }

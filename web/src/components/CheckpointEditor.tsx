@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Trash2, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CHECKPOINT_KINDS, normaliseKind } from '@/lib/checkpointKinds';
 
 export type Checkpoint = {
   id?: string;
@@ -15,29 +16,13 @@ export type Checkpoint = {
 };
 
 /**
- * The kinds that matter for routing legality.
+ * Edit one surveyor-placed point.
  *
- * "Entrance" and "Exit" used to be separate options, which forced a false
- * choice: almost every gate on this campus works in both directions, and there
- * was no way to say so. A gate is now one kind that goes both ways, with
- * one-way variants for the cases that really are one-way.
- *
- * These are not decoration. On this campus they are the ONLY lawful way between
- * the hostel, the campus and the outside, so mapping them precisely is what
- * stops the router inventing a shortcut through a wall.
+ * MOUNTED WITH A `key` TIED TO THE POINT. These fields are `useState`
+ * initialisers, which run once per mount — without the key, tapping a second
+ * pin left the first pin's name and kind in the form and saving wrote them
+ * onto the second point.
  */
-export const CHECKPOINT_KINDS: { value: string; label: string; colour: string; hint?: string }[] = [
-  { value: 'gate', label: 'Gate', colour: '#F8B324', hint: 'Goes both ways' },
-  { value: 'entry_only', label: 'Entry only', colour: '#13A34B', hint: 'In, not out' },
-  { value: 'exit_only', label: 'Exit only', colour: '#5B9DFF', hint: 'Out, not in' },
-  { value: 'emergency', label: 'Security / medical', colour: '#EB442C' },
-  { value: 'shop', label: 'Shop / food', colour: '#C084FC' },
-  { value: 'landmark', label: 'Landmark', colour: '#94A3B8' },
-];
-
-export const kindColour = (kind: string) =>
-  CHECKPOINT_KINDS.find((k) => k.value === kind)?.colour ?? '#94A3B8';
-
 export function CheckpointEditor({
   draft,
   onSave,
@@ -50,8 +35,11 @@ export function CheckpointEditor({
   onCancel: () => void;
 }) {
   const [name, setName] = useState(draft.name);
-  const [kind, setKind] = useState(draft.kind || 'gate');
+  const [kind, setKind] = useState(normaliseKind(draft.kind));
   const [note, setNote] = useState(draft.note ?? '');
+  // Deleting is destructive, permanent, and one thumb-width from Save on the
+  // phone this is used on. Two taps, no dialog to dismiss in the dark.
+  const [confirming, setConfirming] = useState(false);
   const editing = Boolean(draft.id);
 
   return (
@@ -109,25 +97,47 @@ export function CheckpointEditor({
           className="h-8 text-xs"
         />
 
-        <div className="flex gap-2 pt-1">
-          <Button type="submit" size="sm" className="flex-1" disabled={!name.trim()}>
-            {editing ? 'Save changes' : 'Add point'}
-          </Button>
-          {editing && onDelete ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => onDelete(draft.id!)}
-              aria-label="Delete point"
-            >
-              <Trash2 className="size-3.5" />
+        {confirming && editing && onDelete ? (
+          <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2">
+            <p className="text-[11px] leading-relaxed text-foreground">
+              Delete <span className="font-medium">{draft.name || 'this point'}</span> for good?
+            </p>
+            <div className="mt-2 flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="destructive"
+                className="flex-1"
+                onClick={() => onDelete(draft.id!)}
+              >
+                Delete it
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(false)}>
+                Keep
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2 pt-1">
+            <Button type="submit" size="sm" className="flex-1" disabled={!name.trim()}>
+              {editing ? 'Save changes' : 'Add point'}
             </Button>
-          ) : null}
-          <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
-        </div>
+            {editing && onDelete ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setConfirming(true)}
+                aria-label="Delete point"
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            ) : null}
+            <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+              Cancel
+            </Button>
+          </div>
+        )}
       </form>
     </div>
   );

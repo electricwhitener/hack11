@@ -17,6 +17,7 @@ export type PathInfo = {
   litReports: number;
   confidence: number;
   source: string;
+  surveyed?: boolean;
   exposure: number;
   risk: number;
   lat: number;
@@ -26,6 +27,21 @@ export type PathInfo = {
 
 export type SurveyLighting = 'lit' | 'dim' | 'dark';
 export type SurveyTraffic = 'high' | 'medium' | 'low';
+
+/**
+ * One observation, not a whole row.
+ *
+ * The traffic buttons used to call onSurvey with a lighting value derived from
+ * the current estimate — `darkness > 0.5 ? 'dark' : 'lit'` — which promoted the
+ * model's own guess to surveyed ground truth at prior strength 8, and silently
+ * rewrote any existing 'dim' survey to one of the other two. Correcting the
+ * foot traffic now says nothing whatever about the lighting.
+ */
+export type SurveyPatch = {
+  lighting?: SurveyLighting;
+  traffic?: SurveyTraffic;
+  note?: string | null;
+};
 
 /** Where the current belief came from, in words a person would use. */
 const ORIGIN: Record<string, string> = {
@@ -90,16 +106,19 @@ export function PathInspector({
   onReport,
   onSurvey,
   onBlock,
+  onClearSurvey,
   onClose,
 }: {
   info: PathInfo;
   canSurvey: boolean;
   onReport: (span: number[], dark: boolean) => void;
-  onSurvey: (span: number[], lighting: SurveyLighting, traffic: SurveyTraffic | null) => void;
+  onSurvey: (span: number[], patch: SurveyPatch) => void;
   onBlock: (span: number[], blocked: boolean) => void;
+  onClearSurvey: (span: number[]) => void;
   onClose: () => void;
 }) {
   const [note, setNote] = useState('');
+  const [undoing, setUndoing] = useState(false);
   const v = verdict(info.darkness);
   const pct = Math.round(info.darkness * 100);
 
@@ -161,7 +180,7 @@ export function PathInspector({
             ).map(([value, label, cls]) => (
               <button
                 key={value}
-                onClick={() => onSurvey(info.span, value, null)}
+                onClick={() => onSurvey(info.span, { lighting: value, note: note.trim() || undefined })}
                 className={`rounded-md px-2 py-2 text-xs font-medium transition-colors ${cls}`}
               >
                 {label}
@@ -182,7 +201,7 @@ export function PathInspector({
             ).map(([value, label]) => (
               <button
                 key={value}
-                onClick={() => onSurvey(info.span, info.darkness > 0.5 ? 'dark' : 'lit', value)}
+                onClick={() => onSurvey(info.span, { traffic: value })}
                 className="rounded-md border bg-background px-2 py-1.5 text-[11px] transition-colors hover:bg-secondary"
               >
                 {label}
@@ -190,12 +209,29 @@ export function PathInspector({
             ))}
           </div>
 
+          {/* This box used to be write-only: whatever was typed here was never
+              sent anywhere. It now rides along with a lighting record, and can
+              be saved on its own. */}
           <Input
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Note (optional) — e.g. two lamps out"
             className="mt-2.5 h-8 text-xs"
           />
+          {note.trim() ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-1.5 w-full"
+              onClick={() => onSurvey(info.span, { note: note.trim() })}
+            >
+              Save this note
+            </Button>
+          ) : (
+            <p className="mt-1.5 text-[10px] text-muted-foreground">
+              Saved with whatever you record above.
+            </p>
+          )}
 
           <div className="mt-3 border-t pt-3">
             <p className="text-[11px] font-medium text-muted-foreground">
@@ -214,6 +250,41 @@ export function PathInspector({
               {info.blocked ? 'Blocked — tap to unblock' : 'Not walkable — block it'}
             </Button>
           </div>
+
+          {info.surveyed ? (
+            <div className="mt-3 border-t pt-3">
+              <p className="text-[11px] font-medium text-muted-foreground">Got this one wrong?</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                Withdraws the survey on this stretch — lighting, foot traffic, note and block —
+                and puts it back on the modelled estimate. Recording a different value instead
+                would still read as something somebody checked.
+              </p>
+              {undoing ? (
+                <div className="mt-2 flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="flex-1"
+                    onClick={() => onClearSurvey(info.span)}
+                  >
+                    Withdraw it
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setUndoing(false)}>
+                    Keep
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="mt-2 w-full"
+                  onClick={() => setUndoing(true)}
+                >
+                  Undo this survey
+                </Button>
+              )}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

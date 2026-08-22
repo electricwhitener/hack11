@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { listCheckpoints, upsertCheckpoint, deleteCheckpoint } from '@/lib/nightsafety';
 import { isSurveyor, refuse } from '@/lib/surveyAuth';
+import { isKnownKind, normaliseKind } from '@/lib/checkpointKinds';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,11 +26,16 @@ export async function POST(req: Request) {
   if (typeof body.lat !== 'number' || typeof body.lng !== 'number') {
     return NextResponse.json({ error: 'lat and lng are required.' }, { status: 400 });
   }
+  // Reject a kind nothing can draw rather than storing it. The old default was
+  // the literal string 'checkpoint', which is not one of the kinds either.
+  if (body.kind && !isKnownKind(body.kind)) {
+    return NextResponse.json({ error: `Unknown kind: ${body.kind}` }, { status: 400 });
+  }
 
   const saved = await upsertCheckpoint({
     id: body.id,
     name: body.name.trim(),
-    kind: body.kind ?? 'checkpoint',
+    kind: normaliseKind(body.kind),
     lat: body.lat,
     lng: body.lng,
     note: body.note ?? null,
@@ -43,5 +49,7 @@ export async function DELETE(req: Request) {
   const id = new URL(req.url).searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'id is required.' }, { status: 400 });
   const ok = await deleteCheckpoint(id);
-  return NextResponse.json({ deleted: ok }, { status: ok ? 200 : 500 });
+  // Nothing removed means the id was already gone, not that the server broke.
+  if (!ok) return NextResponse.json({ error: 'No such point.' }, { status: 404 });
+  return NextResponse.json({ deleted: true });
 }

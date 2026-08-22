@@ -6,9 +6,10 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 import { RouteStats } from './RouteStats';
-import { PathInspector, type PathInfo, type SurveyLighting, type SurveyTraffic } from './PathInspector';
+import { PathInspector, type PathInfo, type SurveyPatch } from './PathInspector';
 import { SurveyorBar } from './SurveyorBar';
-import { CheckpointEditor, kindColour, type Checkpoint } from './CheckpointEditor';
+import { CheckpointEditor, type Checkpoint } from './CheckpointEditor';
+import { kindColour, DEFAULT_KIND } from '@/lib/checkpointKinds';
 import { useSurveyor } from '@/lib/useSurveyor';
 
 /** [aLat, aLng, bLat, bLng, risk, darkness, exposure, wayId] */
@@ -175,6 +176,17 @@ export function DarkZoneMap() {
   const tunnelsRef = useRef<Set<number>>(new Set());
   const blockedRef = useRef<Set<number>>(new Set());
 
+  // Losing surveyor rights must leave surveyor mode. The "Map a point" button
+  // disappears on sign-out but `mode` did not change, so the map kept opening a
+  // New point form on every tap — a form whose save could only ever 401.
+  useEffect(() => {
+    if (!surveyor.authorised && modeRef.current === 'place') {
+      modeRef.current = 'none';
+      setMode('none');
+      setDraft(null);
+    }
+  }, [surveyor.authorised]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -252,7 +264,7 @@ export function DarkZoneMap() {
 
       m.on('click', (ev: L.LeafletMouseEvent) => {
         if (modeRef.current === 'place') {
-          setDraft({ name: '', kind: 'entrance', lat: ev.latlng.lat, lng: ev.latlng.lng });
+          setDraft({ name: '', kind: DEFAULT_KIND, lat: ev.latlng.lat, lng: ev.latlng.lng });
           return;
         }
         if (modeRef.current === 'none') return;
@@ -543,16 +555,12 @@ export function DarkZoneMap() {
     }
   }
 
-  async function submitSurvey(
-    span: number[],
-    lighting: SurveyLighting,
-    traffic: SurveyTraffic | null,
-  ) {
+  async function submitSurvey(span: number[], patch: SurveyPatch) {
     try {
       const res = await fetch('/api/survey', {
         method: 'POST',
         headers: { 'content-type': 'application/json', ...surveyor.headers() },
-        body: JSON.stringify({ span, lighting, traffic }),
+        body: JSON.stringify({ span, ...patch }),
       });
       if (!res.ok) {
         toast.error('Could not save that survey.');
@@ -564,16 +572,46 @@ export function DarkZoneMap() {
       hoverRef.current = null;
       drawHover(null);
 
-      const word = lighting === 'dark' ? 'unlit' : lighting === 'dim' ? 'dim' : 'lit';
-      toast.success(`${r.label} · ${r.meters} m marked ${word}`, {
-        description:
-          (traffic ? `Foot traffic set to ${traffic}. ` : '') +
-          (r.queueRank > 0
-            ? `Repair queue #${r.queueRank} — ${r.benefitPct}% of campus risk.`
-            : 'Not enough foot traffic to enter the repair queue.'),
-      });
+      const word = patch.lighting === 'dark' ? 'unlit' : patch.lighting === 'dim' ? 'dim' : 'lit';
+      toast.success(
+        patch.lighting
+          ? `${r.label} · ${r.meters} m marked ${word}`
+          : `${r.label} · ${r.meters} m updated`,
+        {
+          description:
+            (patch.traffic ? `Foot traffic set to ${patch.traffic}. ` : '') +
+            (patch.note ? 'Note saved. ' : '') +
+            (r.queueRank > 0
+              ? `Repair queue #${r.queueRank} — ${r.benefitPct}% of campus risk.`
+              : 'Not enough foot traffic to enter the repair queue.'),
+        },
+      );
     } catch {
       toast.error('Could not save that survey.');
+    }
+  }
+
+  /** Withdraw a survey over a span, back to the modelled estimate. */
+  async function submitClearSurvey(span: number[]) {
+    try {
+      const res = await fetch(`/api/survey?span=${span.join(',')}`, {
+        method: 'DELETE',
+        headers: surveyor.headers(),
+      });
+      if (!res.ok) {
+        toast.error('Could not undo that survey.');
+        return;
+      }
+      const r = await res.json();
+      await refreshGraph();
+      setSelected(null);
+      hoverRef.current = null;
+      drawHover(null);
+      toast.success(`${r.label} — survey withdrawn`, {
+        description: 'That stretch is back on the modelled estimate.',
+      });
+    } catch {
+      toast.error('Could not undo that survey.');
     }
   }
 
@@ -635,7 +673,14 @@ export function DarkZoneMap() {
       }).bindTooltip(`${c.name}${c.note ? ` — ${c.note}` : ''}`, { direction: 'top' });
 
       marker.on('click', (ev: L.LeafletMouseEvent) => {
-        ev.originalEvent?.stopPropagation();
+        // MUST be the Leaflet event, not ev.originalEvent. Leaflet decides
+        // whether to keep propagating by checking `originalEvent._stopped`, a
+        // flag only L.DomEvent sets — calling the native stopPropagation on the
+        // raw DOM event leaves it unset. So the map's own click handler still
+        // ran afterwards, and in 'place' mode it replaced the point we had just
+        // opened with a blank new one. That is why an existing point could
+        // never be edited or deleted, only duplicated.
+        L.DomEvent.stopPropagation(ev);
         if (modeRef.current === 'place') setDraft(c);
       });
       marker.addTo(layer);
@@ -778,6 +823,10 @@ export function DarkZoneMap() {
         {draft ? (
           <div className="pointer-events-auto">
             <CheckpointEditor
+              /* Remount per point: the editor seeds its fields from `draft` in
+                 useState, so without this, tapping a second pin kept the first
+                 pin's name in the form and saving wrote it onto the second. */
+              key={draft.id ?? `new:${draft.lat},${draft.lng}`}
               draft={draft}
               onSave={saveCheckpoint}
               onDelete={removeCheckpoint}
@@ -794,6 +843,7 @@ export function DarkZoneMap() {
               onReport={submitReport}
               onSurvey={submitSurvey}
               onBlock={submitBlock}
+              onClearSurvey={submitClearSurvey}
               onClose={() => setSelected(null)}
             />
           </div>
@@ -840,7 +890,7 @@ export function DarkZoneMap() {
             disabled={!ready}
             onClick={() => toggleMode('place')}
           >
-            {mode === 'place' ? 'Tap to place' : 'Map a point'}
+            {mode === 'place' ? 'Tap map to add · pin to edit' : 'Map a point'}
             {checkpoints.length > 0 ? ` (${checkpoints.length})` : ''}
           </Button>
         ) : null}
