@@ -68,10 +68,10 @@ export async function POST(req: Request) {
            * the message users were seeing: three tools would run, then the final
            * answer would die with no explanation and no clue that it was quota.
            *
-           * Routing it through friendlyError at least tells them what happened
-           * and what to do about it.
+           * midStreamError handles that case, and deliberately does NOT claim
+           * the whole chain is spent - only this one pair is.
            */
-          writer.merge(result.toUIMessageStream({ onError: friendlyError }));
+          writer.merge(result.toUIMessageStream({ onError: midStreamError }));
           return;
         } catch (error) {
           lastError = providerError ?? error;
@@ -81,7 +81,7 @@ export async function POST(req: Request) {
 
       throw lastError ?? new Error('No model available');
     },
-    onError: friendlyError,
+    onError: exhaustedError,
   });
 
   return createUIMessageStreamResponse({ stream });
@@ -122,26 +122,44 @@ function isRetryableModelError(error: unknown): boolean {
   );
 }
 
+const isQuota = (raw: string) => /quota|rate.?limit|RESOURCE_EXHAUSTED|429/i.test(raw);
+
+/** The real error, for us. Users never see this; it goes to the server log. */
+function logFailure(where: string, error: unknown) {
+  console.error(`[chat:${where}]`, errorText(error).slice(0, 400));
+}
+
 /**
- * Never show a raw stack trace to a judge. Quota errors are the likely failure
- * during a demo, so they get a calm, specific message the user can act on.
+ * EXHAUSTED - every (key, model) pair was tried and none worked.
+ *
+ * Only reachable after the loop above walks the whole chain, so "no capacity
+ * left today" is genuinely true here. Users get no mention of API keys or env
+ * vars: that is our problem to fix, not something they can act on.
  */
-function friendlyError(error: unknown): string {
+function exhaustedError(error: unknown): string {
+  logFailure('chain-exhausted', error);
   const raw = errorText(error);
 
-  if (/quota|rate.?limit|RESOURCE_EXHAUSTED|429/i.test(raw)) {
-    return 'Every available model and key has hit its free daily quota. Add another API key (GOOGLE_GENERATIVE_AI_API_KEYS) or wait for the quota to reset.';
-  }
+  if (isQuota(raw)) return 'Daily usage limit reached. The assistant will be back tomorrow.';
+  if (/API key|PERMISSION_DENIED|401|403/i.test(raw)) return 'The assistant is unavailable right now.';
+  if (/not found|404|deprecated/i.test(raw)) return 'The assistant is unavailable right now.';
+  return 'Something went wrong. Please try again.';
+}
 
-  if (/API key|PERMISSION_DENIED|401|403/i.test(raw)) {
-    return 'The AI key is missing or invalid on the server.';
-  }
-
-  if (/not found|404|deprecated/i.test(raw)) {
-    return 'No configured model is available. Check MODEL_CHAIN in your environment variables.';
-  }
-
-  return 'Something went wrong reaching the AI service. Please try again.';
+/**
+ * MID-STREAM - one step of an already-committed (key, model) pair failed.
+ *
+ * Critically NOT the same as the chain being exhausted. A single message costs
+ * roughly four requests (three tool steps plus the final answer) and they all
+ * land on the same pair, so that ONE pair can run dry while the other fourteen
+ * are untouched. Reporting this as "everything is exhausted" was both wrong and
+ * discouraging: asking again restarts the chain and usually just works.
+ */
+function midStreamError(error: unknown): string {
+  logFailure('mid-stream', error);
+  return isQuota(errorText(error))
+    ? 'That answer stopped partway through. Please ask again.'
+    : 'Something went wrong. Please try again.';
 }
 
 function mockStream() {
