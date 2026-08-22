@@ -44,13 +44,39 @@ Verified in production, signed out: map loads (1,883 segments), routing works
 (99% / +1 m), inspect works, reporting works (darkness 0.2 -> 0.52, queue #2),
 queue page 200, agent replies and calls `rankRepairQueue`.
 
+## "An error occurred" in the chat — root cause
+The fallback chain only protects the **first** request of a run. A multi-step
+tool loop makes one API request per step, so steps 2..n run inside the merged
+stream, after a (key, model) pair is committed and can no longer be swapped.
+A later step hitting quota was handled by `toUIMessageStream`'s own default
+handler, which emits the literal string `"An error occurred."`
+
+Observed: three tool calls succeed, then the run dies with no text.
+
+Fixed by passing `onError: friendlyError` to `toUIMessageStream()`. The
+underlying limitation stands — mid-stream failures still cannot fall back to
+another key — so **more keys is the real mitigation**, not a code change.
+
+Budget maths: one message costs ~4 requests (3 tool steps + final text), and a
+(key, model) pair allows 20/day. So each pair is ~5 messages. 15 pairs =
+~75 messages/day.
+
+## Check the DEPLOYED config, not the local one
+`GET /api/health` reports key count, model count, attempts, approx requests/day,
+whether auth is required, and graph stats. It reports counts only — never a key
+value, prefix or length — so it is safe to leave public. Check it before judging:
+
+    curl -s https://sweetjalapenos.vercel.app/api/health | python -m json.tool
+
 ## Gemini keys: adding more is CONFIG, not code
 `provider.ts` already folds `GOOGLE_GENERATIVE_AI_API_KEYS` (comma-separated)
 in with the single-key var and de-duplicates. Keys x models = the daily budget,
 because Google's free quota is 20 req/day **per project per model**, and each
 key from a different Google account is a separate project.
 
-Currently 1 key x 5 models = 5 pairs = ~100 req/day. Four keys = ~400.
+Local `.env.local` has 3 keys (13/15 pairs live, ~260 req/day).
+**Production has 1 key (~100 req/day)** — verified via /api/health. Vercel does
+NOT read .env.local; the keys must be added in the dashboard.
 
 To add: put `GOOGLE_GENERATIVE_AI_API_KEYS="k1,k2,k3,k4"` in `.env.local` AND in
 Vercel -> Settings -> Environment Variables (Production), then redeploy — Vercel
