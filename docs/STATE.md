@@ -180,6 +180,24 @@ path is the best case on the map. **Problems only** drops everything lit to a
 faint ghost; drawn, not hidden, because 19 red segments on an empty canvas say
 nothing about where they are. That toggle is the map moment for the video.
 
+**Foot traffic is shown as words, never as a number.** Exposure is a unitless
+modelled index and its distribution is severely skewed — median 0.011, p95 0.22
+— so printing `0.234` claimed precision we do not have, and fixed cutoffs put
+99% of the network in one bucket (every row of the repair queue read "Quiet",
+including the top-ranked one). `exposureBand()` derives Busy/Some/Quiet from
+**percentiles of the graph at load time**, so "busy" means busy *for this
+campus* and survives a rebuild. Used by the queue and the path inspector.
+
+**The chat card is deliberately bare** — a heading, one line, nothing to click.
+The starter prompts were removed: half demonstrated nothing, and a canned prompt
+frames the agent as the product when the thesis is the opposite. The "Try a
+proactive alert" button was removed too — it pushed a *fabricated* notification,
+which is the one thing this product must never be caught doing on camera.
+
+**Map controls are one panel**, fixed width, stable labels, view control
+separated from survey tools. They were four free-floating buttons whose active
+labels changed length, so the stack reflowed on every click.
+
 **Map palette** — one continuous saturated ramp, no mint:
 
 | | | |
