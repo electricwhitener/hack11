@@ -6,7 +6,7 @@ import {
   areaStats,
   findPlace,
   edges,
-  PLACES,
+  allDestinations,
 } from '@/lib/nightsafety';
 
 /**
@@ -18,7 +18,12 @@ import {
  * map and the queue would still work — which is the whole product thesis.
  */
 
-const placeNames = PLACES.map((p) => p.name).join(', ');
+/*
+ * Read at call time, never cached at module load. Surveyor-placed shops arrive
+ * while the app is running, and a snapshot taken when the module first loaded
+ * would leave the agent insisting a place it can route to does not exist.
+ */
+const placeNames = () => allDestinations().map((p) => p.name).join(', ');
 
 /** Returns structured chart data. The UI renders it as a real chart. */
 const showChart = tool({
@@ -55,7 +60,7 @@ const planSafeRoute = tool({
     'Compare the shortest walking route against the best-lit one between two places, and ' +
     'return the tradeoff: extra distance versus reduction in unlit walking. Use whenever ' +
     'someone asks how to get somewhere, or whether a walk is safe at night. ' +
-    `Known places: ${placeNames}.`,
+    `Known places: ${placeNames()}.`,
   inputSchema: z.object({
     from: z.string().describe('Starting place name, e.g. "B3 Block".'),
     to: z.string().describe('Destination place name, e.g. "Central Library" or "zanak".'),
@@ -76,7 +81,7 @@ const planSafeRoute = tool({
     const b = findPlace(to);
     if (!a || !b) {
       return {
-        error: `Could not find ${!a ? from : to}. Known places: ${placeNames}.`,
+        error: `Could not find ${!a ? from : to}. Known places: ${placeNames()}.`,
       };
     }
 

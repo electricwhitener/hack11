@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { routePair, findPlace, loadAll, type LatLng } from '@/lib/nightsafety';
+import { routePair, findPlace, checkpointPlaces, loadAll, type LatLng } from '@/lib/nightsafety';
 
 /**
  * Plans the shortest/safest pair between two named landmarks or raw points.
@@ -14,19 +14,29 @@ export async function POST(req: Request) {
     atMinutes?: number | null;
   };
 
-  // Landmarks resolve to their exact graph node; raw coordinates get snapped.
+  await loadAll();
+
+  /*
+   * A landmark resolves to its exact graph node. A surveyor-placed point
+   * resolves to its COORDINATE instead, because the nearest node may be some
+   * way off it — passing the coordinate is what lets routePair report how far
+   * short of the actual shop the route stops.
+   */
+  const placed = new Map(checkpointPlaces().map((p) => [p.name.toLowerCase(), p]));
   const resolve = (v: string | LatLng | undefined): number | LatLng | undefined => {
     if (!v) return undefined;
-    if (typeof v === 'string') return findPlace(v)?.node;
-    return v;
+    if (typeof v !== 'string') return v;
+    const hit = findPlace(v);
+    if (!hit) return undefined;
+    return placed.has(hit.name.toLowerCase()) ? hit.at : hit.node;
   };
-
-  await loadAll();
 
   const from = resolve(body.from);
   const to = resolve(body.to);
 
-  if (!from || !to) {
+  // `from === undefined`, not `!from`: node 0 is a perfectly good graph node
+  // and `!0` would reject it as unresolved.
+  if (from === undefined || to === undefined) {
     return NextResponse.json(
       { error: 'Could not resolve both endpoints. Pass a known landmark or {lat,lng}.' },
       { status: 400 },

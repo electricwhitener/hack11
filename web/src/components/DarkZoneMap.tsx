@@ -45,7 +45,7 @@ export type ClosureNote = {
 };
 
 export type RoutePair = {
-  status: 'ok' | 'permission' | 'closed';
+  status: 'ok' | 'permission' | 'closed' | 'partial';
   shortest: RouteLeg;
   safest: RouteLeg;
   closures: ClosureNote[];
@@ -54,6 +54,8 @@ export type RoutePair = {
   detourPct: number;
   darkReductionPct: number;
   identical: boolean;
+  /** How far short of the requested point the drawn route stops. */
+  approachMeters: number;
 };
 
 /** A user reports a stretch they can actually see, not a whole path. */
@@ -195,6 +197,8 @@ export function DarkZoneMap() {
   /** Leaflet binds marker handlers once, so these must be read through refs. */
   const surveyorRef = useRef(false);
   const renamedRef = useRef<Set<string>>(new Set());
+  /** Placed-point names, for validating the pickers without a render cycle. */
+  const cpNamesRef = useRef<string[]>([]);
 
   // Leaflet handlers read the mode through a ref, so keep it in step and
   // repaint — the segments are already loaded, only their styling changes.
@@ -703,11 +707,34 @@ export function DarkZoneMap() {
     drawHover(null);
   }
 
+  /**
+   * Drop a picked endpoint only once it genuinely no longer exists.
+   *
+   * Both lists have to be consulted. Checking landmarks alone would clear a
+   * chosen shop the moment any landmark was renamed; checking neither leaves a
+   * deleted point selected, where the select renders blank and the search then
+   * fails server-side on a name nothing can resolve.
+   */
+  function keepEndpointsValid(placeList: Place[], pointNames: string[]) {
+    const names = new Set([...placeList.map((p) => p.name), ...pointNames]);
+    const fallbackFrom = placeList.find((p) => p.kind === 'hostel')?.name ?? placeList[0]?.name ?? '';
+    const fallbackTo = placeList.find((p) => p.kind === 'dest')?.name ?? placeList[1]?.name ?? '';
+    setFrom((v) => (v && names.has(v) ? v : fallbackFrom));
+    setTo((v) => (v && names.has(v) ? v : fallbackTo));
+  }
+
   async function refreshCheckpoints() {
     try {
       const d = await fetch('/api/checkpoints').then((r) => r.json());
-      setCheckpoints(d.checkpoints ?? []);
-      drawCheckpoints(d.checkpoints ?? []);
+      const list: Checkpoint[] = d.checkpoints ?? [];
+      cpNamesRef.current = list.map((c) => c.name);
+      setCheckpoints(list);
+      drawCheckpoints(list);
+      // A point that has just been deleted must not stay selected.
+      setPlaces((cur) => {
+        keepEndpointsValid(cur, cpNamesRef.current);
+        return cur;
+      });
     } catch {
       /* map still works without them */
     }
@@ -790,9 +817,7 @@ export function DarkZoneMap() {
       renamedRef.current = new Set(Object.keys(d.overrides ?? {}));
       setPlaces(list);
       drawPlaces(list);
-      // A hidden landmark must not stay selected in a picker.
-      setFrom((v) => (list.some((p) => p.name === v) ? v : (list[0]?.name ?? '')));
-      setTo((v) => (list.some((p) => p.name === v) ? v : (list[1]?.name ?? '')));
+      keepEndpointsValid(list, cpNamesRef.current);
     } catch {
       /* the map still works with the landmarks it already has */
     }
@@ -972,9 +997,9 @@ export function DarkZoneMap() {
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1000] flex max-h-[48dvh] flex-col gap-3 overflow-y-auto p-3 pr-[4.75rem] sm:inset-y-0 sm:right-auto sm:max-h-none sm:w-full sm:max-w-sm sm:p-4 sm:pr-4">
         <div className="pointer-events-auto rounded-xl border bg-card/95 p-3 shadow-lg backdrop-blur">
           <div className="flex items-center gap-2">
-            <PlaceSelect places={places} value={from} onChange={setFrom} />
+            <PlaceSelect places={places} points={checkpoints} value={from} onChange={setFrom} />
             <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
-            <PlaceSelect places={places} value={to} onChange={setTo} />
+            <PlaceSelect places={places} points={checkpoints} value={to} onChange={setTo} />
           </div>
           <div className="mt-2 space-y-2">
             <select
@@ -1209,15 +1234,23 @@ function Row({ label, value, tone }: { label: string; value: string; tone?: 'amb
 /** Hostels and destinations grouped, because that is how a student thinks about it. */
 function PlaceSelect({
   places,
+  points,
   value,
   onChange,
 }: {
   places: Place[];
+  /** Surveyor-placed shops and points. They are destinations too. */
+  points: { name: string }[];
   value: string;
   onChange: (v: string) => void;
 }) {
   const hostels = places.filter((p) => p.kind === 'hostel');
   const dests = places.filter((p) => p.kind === 'dest');
+  // A placed point repeating a landmark name would give the picker two
+  // identical options that resolve to the same thing.
+  const known = new Set(places.map((p) => p.name.trim().toLowerCase()));
+  const placed = points.filter((p) => p.name.trim() && !known.has(p.name.trim().toLowerCase()));
+
   return (
     <select
       value={value}
@@ -1238,6 +1271,15 @@ function PlaceSelect({
           </option>
         ))}
       </optgroup>
+      {placed.length ? (
+        <optgroup label="Mapped by surveyors">
+          {placed.map((p) => (
+            <option key={p.name} value={p.name}>
+              {p.name}
+            </option>
+          ))}
+        </optgroup>
+      ) : null}
     </select>
   );
 }

@@ -69,6 +69,32 @@ export function ClosedNotice({ plan }: { plan: RoutePair }) {
   );
 }
 
+/**
+ * The route stops short of the pin.
+ *
+ * Not a failure and not a closure: a shop mapped on ground the path network
+ * does not cover is simply not joined up. Refusing to draw anything would be
+ * the wrong kind of honesty, and drawing it without saying so would be a lie
+ * about where the route ends — so it draws, and says.
+ */
+function ApproachBanner({ plan }: { plan: RoutePair }) {
+  if (plan.approachMeters < 25) return null;
+  const partial = plan.status === 'partial';
+
+  return (
+    <div className="mb-3 rounded-lg border border-sky-500/40 bg-sky-500/10 p-3">
+      <p className="text-sm font-semibold text-sky-400">
+        Gets you within {plan.approachMeters} m
+      </p>
+      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+        {partial
+          ? 'No mapped path reaches this point, so this is the closest the network gets. The last stretch is on your own.'
+          : 'This spot sits off the path network — the route ends at the nearest mapped path.'}
+      </p>
+    </div>
+  );
+}
+
 export function RouteStats({ plan }: { plan: RoutePair }) {
   if (plan.status === 'closed') return <ClosedNotice plan={plan} />;
 
@@ -76,6 +102,7 @@ export function RouteStats({ plan }: { plan: RoutePair }) {
     return (
       <div className="p-4 text-sm">
         <PermitBanner plan={plan} />
+        <ApproachBanner plan={plan} />
         <div className="font-medium text-emerald-500">Already the safest way</div>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
           The shortest route ({plan.shortest.meters} m) is also the best-lit one. No detour
@@ -110,6 +137,7 @@ export function RouteStats({ plan }: { plan: RoutePair }) {
   return (
     <div className="p-4">
       <PermitBanner plan={plan} />
+      <ApproachBanner plan={plan} />
       <div className="flex items-baseline gap-2">
         <span className="text-3xl font-semibold tabular-nums text-emerald-500">
           {plan.darkReductionPct}%

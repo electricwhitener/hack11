@@ -36,6 +36,8 @@ export async function GET() {
     stats,
     area: meta.area,
     // Hidden and renamed landmarks are corrected here, not in graph.json.
+    // `places` is what gets DRAWN; `destinations` is what can be picked, and
+    // includes every surveyor-placed shop and point.
     places: visiblePlaces(),
     tunnels: tunnelSegments(),
     blocked: blockedSegments(),

@@ -359,6 +359,69 @@ async function main() {
   );
   check('unauthorised landmark edit is refused', anonPlace.status === 401, `got ${anonPlace.status}`);
 
+  console.log('');
+  console.log('PLACED POINTS ARE DESTINATIONS');
+  checkpointRows = [
+    { id: 'p-1', name: 'PHOTOCOPY WALE BHAIYA', kind: 'shop', lat: 26.8425, lng: 75.5631, note: null,
+      barrier: null, closes: null, opens: null, permit: null },
+    // Deliberately away from the mapped paths: the nearest-reachable case.
+    { id: 'p-2', name: 'Middle Of Nowhere', kind: 'shop', lat: 26.8365, lng: 75.572, note: null,
+      barrier: null, closes: null, opens: null, permit: null },
+    // A name that collides with an imported landmark.
+    { id: 'p-3', name: 'zanak', kind: 'shop', lat: 26.843, lng: 75.564, note: null,
+      barrier: null, closes: null, opens: null, permit: null },
+  ];
+  await ns.loadGates();
+
+  const names = ns.allDestinations().map((p) => p.name);
+  check('a placed shop is a destination', names.includes('PHOTOCOPY WALE BHAIYA'));
+  check('imported landmarks are still destinations', names.includes('B3 Block'));
+  check(
+    'a duplicate name appears once, not twice',
+    names.filter((n) => n.toLowerCase() === 'zanak').length === 1,
+    String(names.filter((n) => n.toLowerCase() === 'zanak').length),
+  );
+  check('findPlace resolves a placed shop', Boolean(ns.findPlace('PHOTOCOPY WALE BHAIYA')));
+  check('findPlace stays case-insensitive', Boolean(ns.findPlace('photocopy wale bhaiya')));
+  check('a placed shop gets a real graph node', (ns.findPlace('Middle Of Nowhere')?.node ?? -1) >= 0);
+
+  console.log('');
+  console.log('ROUTING TO SOMEWHERE OFF THE NETWORK');
+  const b3 = ns.findPlace('B3 Block')!;
+  const far = ns.findPlace('Middle Of Nowhere')!;
+  const toFar = ns.routePair(b3.node, far.at, 4, 1200);
+  console.log(`     -> ${toFar.status}, ${toFar.safest.meters} m, stops ${toFar.approachMeters} m short`);
+  check('something is still drawn', toFar.status === 'closed' || toFar.safest.meters > 0, toFar.status);
+  check(
+    'the shortfall is reported',
+    toFar.status === 'closed' || toFar.approachMeters > 0,
+    `status=${toFar.status} approach=${toFar.approachMeters}`,
+  );
+
+  const normal = ns.routePair(b3.node, ns.findPlace('Central Library')!.node, 4, 1200);
+  check('landmark-to-landmark reports no shortfall', normal.approachMeters === 0, String(normal.approachMeters));
+  check('and is still ok', normal.status === 'ok', normal.status);
+
+  console.log('');
+  console.log('A CLOSURE STILL BEATS A PARTIAL ROUTE');
+  const shutAt = ns.nodeLatLng(b3.node);
+  checkpointRows.push({
+    id: 'p-4', name: 'Sealed', kind: 'gate', lat: shutAt.lat, lng: shutAt.lng,
+    note: null, barrier: 'hard', closes: null, opens: null, permit: null,
+  });
+  await ns.loadGates();
+  const sealed = ns.routePair(ns.findPlace('Central Library')!.node, b3.node, 4, 1200);
+  console.log(`     -> ${sealed.status}, stops ${sealed.approachMeters} m short`);
+  check(
+    'a shut gate reports CLOSED, not a near-miss route',
+    sealed.status === 'closed',
+    `status=${sealed.status} approach=${sealed.approachMeters}`,
+  );
+  check('and names what is in the way', sealed.closures.length > 0,
+    JSON.stringify(sealed.closures.map((c) => c.label)));
+  checkpointRows = [];
+  await ns.loadGates();
+
   console.log(failures === 0 ? '\nAll checks passed.\n' : `\n${failures} CHECK(S) FAILED\n`);
   process.exit(failures === 0 ? 0 : 1);
 }

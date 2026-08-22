@@ -597,6 +597,15 @@ export function nearestEdge(p: LatLng): Edge {
 export const MAX_REPORT_METERS = 50;
 
 /**
+ * How far short a "closest we can get" route may stop.
+ *
+ * Past this the answer stops being useful: walking somebody a kilometre to a
+ * point that is still a kilometre from where they asked for is not help, it is
+ * a wrong answer with a line drawn through it. Beyond this we say closed.
+ */
+const MAX_APPROACH_METERS = 900;
+
+/**
  * The segments a report may cover: same path, nearest first, stopping at
  * MAX_REPORT_METERS. The client computes the identical span for its hover
  * highlight, so what you see highlighted is exactly what gets reported.
@@ -932,7 +941,16 @@ class MinHeap {
 }
 
 /** Dijkstra with a pluggable edge cost — the same routine drives both routes. */
-function shortestPath(from: number, to: number, cost: (e: Edge) => number): number[] {
+/**
+ * Dijkstra over the whole reachable set, with no early exit.
+ *
+ * The early `break` on reaching the target was a fair optimisation while the
+ * only question was "how do I get to B". It cannot answer the second question —
+ * "if B is unreachable, what is the closest I CAN get" — because that needs
+ * every node the walker could stand on, not just the ones visited before B.
+ * The graph is 1,883 edges; exploring all of it costs less than a millisecond.
+ */
+function dijkstra(from: number, cost: (e: Edge) => number) {
   const dist = new Map<number, number>([[from, 0]]);
   const prev = new Map<number, number>();
   const done = new Set<number>();
@@ -940,15 +958,15 @@ function shortestPath(from: number, to: number, cost: (e: Edge) => number): numb
   pq.push(0, from);
 
   while (pq.size) {
-    const top = pq.pop()!;
-    const [d, u] = top;
+    const [d, u] = pq.pop()!;
     if (done.has(u)) continue;
-    if (u === to) break;
     done.add(u);
 
     for (const { to: v, e } of ADJ.get(u) ?? []) {
       if (done.has(v)) continue;
       const nd = d + cost(e);
+      // An impassable edge costs Infinity, and Infinity < Infinity is false, so
+      // a node reachable only through one never enters `dist` at all.
       if (nd < (dist.get(v) ?? Infinity)) {
         dist.set(v, nd);
         prev.set(v, u);
@@ -956,8 +974,10 @@ function shortestPath(from: number, to: number, cost: (e: Edge) => number): numb
       }
     }
   }
+  return { dist, prev };
+}
 
-  if (!dist.has(to)) return [];
+function walkBack(prev: Map<number, number>, to: number): number[] {
   const path = [to];
   let cur = to;
   while (prev.has(cur)) {
@@ -965,6 +985,40 @@ function shortestPath(from: number, to: number, cost: (e: Edge) => number): numb
     path.unshift(cur);
   }
   return path;
+}
+
+function shortestPath(from: number, to: number, cost: (e: Edge) => number): number[] {
+  if (from === to) return [from];
+  const { dist, prev } = dijkstra(from, cost);
+  if (!dist.has(to)) return [];
+  return walkBack(prev, to);
+}
+
+/**
+ * The reachable node closest, as the crow flies, to somewhere unreachable.
+ *
+ * What a maps app does when the pin is up a private drive: it does not refuse,
+ * it walks you to the end of the road and lets you cover the rest yourself.
+ * Straight-line distance is the right measure here — the walker is going to
+ * finish the journey by looking at it, not by following the graph.
+ */
+function nearestReachable(
+  from: number,
+  goal: LatLng,
+  cost: (e: Edge) => number,
+): { node: number; path: number[]; gapMeters: number } | null {
+  const { dist, prev } = dijkstra(from, cost);
+  let best = -1;
+  let bd = Infinity;
+  for (const [node] of dist) {
+    const gap = haversine(nodeLatLng(node), goal);
+    if (gap < bd) {
+      bd = gap;
+      best = node;
+    }
+  }
+  if (best < 0) return null;
+  return { node: best, path: walkBack(prev, best), gapMeters: Math.round(bd) };
 }
 
 function edgeBetween(a: number, b: number): Edge | undefined {
@@ -1051,7 +1105,12 @@ export type ClosureNote = {
  * they cannot get there is the honest answer, and a safety app that refuses to
  * draw a line is more trustworthy than one that always draws one.
  */
-export type RouteStatus = 'ok' | 'permission' | 'closed';
+export type RouteStatus =
+  | 'ok'
+  | 'permission'
+  | 'closed'
+  /** No path reaches the destination, so this one gets as close as it can. */
+  | 'partial';
 
 export type RoutePair = {
   status: RouteStatus;
@@ -1067,6 +1126,15 @@ export type RoutePair = {
   /** Share of dark walking removed, 0..100. */
   darkReductionPct: number;
   identical: boolean;
+  /**
+   * How far the drawn route stops short of the point that was asked for.
+   *
+   * Non-zero whenever the destination is not itself on the path network — a
+   * shop set back from the road, a stall on ground nobody has mapped. The
+   * walker covers the last stretch by looking, so it has to be stated rather
+   * than quietly folded into the distance.
+   */
+  approachMeters: number;
 };
 
 /**
@@ -1215,6 +1283,13 @@ export function routePair(
   sync();
   const a = typeof from === 'number' ? from : nearestNode(from);
   const b = typeof to === 'number' ? to : nearestNode(to);
+  /*
+   * Where the walker actually asked to go, as opposed to the graph node we
+   * snapped it to. A landmark carries its own node so the two coincide; a
+   * surveyor-placed shop may sit well off the path network, and the difference
+   * is the walk you finish on foot without a line to follow.
+   */
+  const goal: LatLng = typeof to === 'number' ? nodeLatLng(to) : to;
 
   /*
    * Decide zone reachability FIRST. If every door between the two zones is
@@ -1300,6 +1375,7 @@ export function routePair(
         status,
         shortest: EMPTY_ROUTE,
         safest: EMPTY_ROUTE,
+        approachMeters: 0,
         closures,
         atMinutes,
         detourMeters: 0,
@@ -1309,10 +1385,12 @@ export function routePair(
       };
     }
     const detourMeters = pair.safest.meters - pair.shortest.meters;
+    const end = pair.safest.path[pair.safest.path.length - 1];
     return {
       status,
       shortest: pair.shortest,
       safest: pair.safest,
+      approachMeters: end === undefined ? 0 : Math.round(haversine(nodeLatLng(end), goal)),
       closures,
       atMinutes,
       detourMeters,
@@ -1369,10 +1447,52 @@ export function routePair(
     return finish('permission', permitted, notesOn(permitted.shortest.segments));
   }
 
-  // 3. Nothing works. Say so, and name what is in the way — found by routing
-  //    as if time did not exist, then reporting the gates that route crosses.
-  const anyRoute = shortestPath(a, b, (e) => e.length);
-  return finish('closed', null, notesOn(summarise(anyRoute).segments));
+  /*
+   * 3. Nothing reaches the destination — but "nothing reaches it" and "you
+   *    cannot go" are different answers, and only one of them is usually true.
+   *
+   *    A shop mapped on ground the path network does not cover is not shut; it
+   *    is simply not joined up. Refusing to draw anything there is the wrong
+   *    kind of honesty. Walk them to the closest point that IS reachable and
+   *    say how far short it stops, which is what a maps app does with a pin up
+   *    a private drive.
+   *
+   *    Zone closures are checked FIRST, above: if every door is locked this
+   *    code is never reached, so a partial route can never quietly walk
+   *    somebody past a shut gate.
+   */
+  /*
+   * Distinguish "not joined up" from "shut", because they deserve opposite
+   * answers. Routing with every gate ignored says whether the destination is
+   * connected AT ALL. If it is, something is shut and the honest answer is the
+   * closed notice naming that gate — walking somebody to within 18 m of a
+   * locked door and calling it "nearly there" would be worse than useless.
+   * Only when no path exists under ANY rule is this a connectivity gap.
+   */
+  const ignoringGates = shortestPath(a, b, (e) => e.length);
+  const near =
+    ignoringGates.length > 0
+      ? null
+      : nearestReachable(a, goal, (e) => (strict(e) ? e.length : Infinity));
+
+  if (near && near.node !== a && near.gapMeters <= MAX_APPROACH_METERS) {
+    const pair = {
+      shortest: summarise(near.path),
+      safest: summarise(
+        shortestPath(a, near.node, (e) =>
+          strict(e) ? e.length * (1 + alpha * e.risk) : Infinity,
+        ),
+      ),
+    };
+    // The safer variant may not exist under strict costs even though the
+    // shortest one did; fall back rather than drawing an empty line.
+    if (pair.safest.path.length === 0) pair.safest = pair.shortest;
+    return finish('partial', pair, notesOn(pair.shortest.segments));
+  }
+
+  // 4. Shut, or too far off the network to help with. Name what is in the way,
+  //    read off the route that would exist if time did not.
+  return finish('closed', null, notesOn(summarise(ignoringGates).segments));
 }
 
 export type QueueItem = {
@@ -1604,13 +1724,55 @@ export async function clearPlaceOverride(name: string): Promise<boolean> {
   }
 }
 
+/**
+ * Surveyor-placed points, as things you can actually route to.
+ *
+ * A shop somebody walked out and mapped is a destination in every sense that
+ * matters — it was simply invisible to the picker, because the picker only ever
+ * knew about the 32 landmarks baked into graph.json.
+ *
+ * Each one snaps to the nearest graph node. That node can be some way off (a
+ * shop set back from the road, a stall on a path nobody mapped), which is
+ * exactly why routePair reports how far short of the real point it stopped
+ * rather than pretending the node IS the shop.
+ *
+ * Cached against the checkpoint store version: nearestNode is a scan of every
+ * node, and doing that per checkpoint per request would be wasteful.
+ */
+let cpPlaceCache: { version: number; list: Place[] } | null = null;
+
+export function checkpointPlaces(): Place[] {
+  if (cpPlaceCache?.version === GSTORE.version) return cpPlaceCache.list;
+  const list: Place[] = GSTORE.list.map((c) => ({
+    name: c.name,
+    at: { lat: c.lat, lng: c.lng },
+    node: nearestNode({ lat: c.lat, lng: c.lng }),
+    kind: 'dest' as const,
+  }));
+  cpPlaceCache = { version: GSTORE.version, list };
+  return list;
+}
+
+/** Everything a person may pick as an endpoint: landmarks and placed points. */
+export function allDestinations(): Place[] {
+  const seen = new Set<string>();
+  const out: Place[] = [];
+  for (const p of [...visiblePlaces(), ...checkpointPlaces()]) {
+    const key = p.name.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(p);
+  }
+  return out;
+}
+
 export function findPlace(q: string): Place | undefined {
   const n = q.trim().toLowerCase();
   if (!n) return undefined;
   // Search the visible list first so a renamed landmark resolves under its new
   // name, then fall back to every imported name — a route or a saved agent
   // conversation referring to the original must not break when it is renamed.
-  const pools = [visiblePlaces(), PLACES];
+  const pools = [visiblePlaces(), checkpointPlaces(), PLACES];
   for (const pool of pools) {
     const hit =
       pool.find((p) => p.name.toLowerCase() === n) ??
@@ -1892,12 +2054,25 @@ const GSTORE: GateStore = (GC.__nightlineGates ??= { list: [], version: 0 });
 export type GateRule = AccessRule & { name: string; segments: number[] };
 
 let gateCache: { version: number; rules: GateRule[]; bySegment: Map<number, GateRule> } | null = null;
+/** Serialised checkpoints, so an unchanged read costs nothing to apply. */
+let gateFingerprint = '';
 
 /** Refill placed gates from Postgres. Non-fatal on failure. */
 export async function loadGates(): Promise<void> {
   if (!hasSupabase) return;
   const rows = await listCheckpoints();
   if (!rows.length && GSTORE.list.length) return; // a failed read must not disarm gates
+
+  /*
+   * Only bump the version when something actually changed.
+   *
+   * The version invalidates two caches, and rebuilding either means scanning
+   * all 1,883 edges per gate and every node per checkpoint. Bumping it on every
+   * load meant paying that on every request to redo identical work.
+   */
+  const fingerprint = JSON.stringify(rows);
+  if (fingerprint === gateFingerprint) return;
+  gateFingerprint = fingerprint;
   GSTORE.list = rows;
   GSTORE.version += 1;
 }

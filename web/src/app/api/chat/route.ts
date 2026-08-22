@@ -9,6 +9,7 @@ import {
 import { hasLLMKey, modelFor, MODEL_ATTEMPTS, googleOptions } from '@/lib/ai/provider';
 import { tools } from '@/lib/ai/tools';
 import { SYSTEM_PROMPT } from '@/lib/ai/prompt';
+import { loadAll } from '@/lib/nightsafety';
 
 export const maxDuration = 60;
 
@@ -17,6 +18,17 @@ export async function POST(req: Request) {
 
   // Mock mode: lets you build and demo the UI with no API key and zero quota burn.
   if (!hasLLMKey) return mockStream();
+
+  /*
+   * Pull shared state BEFORE the model runs.
+   *
+   * Every other route does this and this one never did, so on a cold lambda the
+   * agent answered from an empty store: no surveys, no gates, and no knowledge
+   * of a single surveyor-placed shop. It would then insist a place it can
+   * perfectly well route to does not exist. Once per request is enough — the
+   * tools execute inside this same invocation.
+   */
+  await loadAll();
 
   const modelMessages = await convertToModelMessages(messages);
 
