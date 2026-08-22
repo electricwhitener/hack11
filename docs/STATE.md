@@ -31,6 +31,36 @@ Remaining: screenshot into `docs/shots/map.png`, then regenerate the deck
 (`npx tsx scripts/facts.ts` then `python build_deck.py`) — its numbers still
 predate the belief model and the 50 m cap.
 
+## Auth is OPTIONAL — do not re-add the gate
+`/` used to `redirect('/login')` for signed-out visitors, so anyone opening the
+deployed link hit a signup form before seeing the product. Nothing required it:
+`/api/chat` has no auth check, `/api/graph`, `/api/report` and `/api/inspect`
+are open, and `/queue` was already public.
+
+Signing in adds **only** saved conversations. `listChats()` returns `[]` on 401,
+so the history list degrades cleanly. `/` is now statically prerendered.
+
+Verified in production, signed out: map loads (1,883 segments), routing works
+(99% / +1 m), inspect works, reporting works (darkness 0.2 -> 0.52, queue #2),
+queue page 200, agent replies and calls `rankRepairQueue`.
+
+## Gemini keys: adding more is CONFIG, not code
+`provider.ts` already folds `GOOGLE_GENERATIVE_AI_API_KEYS` (comma-separated)
+in with the single-key var and de-duplicates. Keys x models = the daily budget,
+because Google's free quota is 20 req/day **per project per model**, and each
+key from a different Google account is a separate project.
+
+Currently 1 key x 5 models = 5 pairs = ~100 req/day. Four keys = ~400.
+
+To add: put `GOOGLE_GENERATIVE_AI_API_KEYS="k1,k2,k3,k4"` in `.env.local` AND in
+Vercel -> Settings -> Environment Variables (Production), then redeploy — Vercel
+does not read `.env.local`.
+
+Validate before judging with:
+    cd web && DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/check-keys.ts
+It probes every (key, model) pair against the live API and distinguishes an
+invalid key from one that has merely spent today's quota.
+
 ## Login: Google account cannot sign in with a password
 Not a password bug. **Supabase stores no password for an OAuth signup**, so
 `signInWithPassword` on a Google-created account can never match — the Google
