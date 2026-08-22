@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Map as LMap, LayerGroup, Canvas } from 'leaflet';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { ArrowRight } from 'lucide-react';
 import { RouteStats } from './RouteStats';
 import { PathInspector, type PathInfo, type SurveyLighting, type SurveyTraffic } from './PathInspector';
 import { SurveyorBar } from './SurveyorBar';
@@ -62,13 +63,13 @@ const MAX_REPORT_M = 50;
  * exactly backwards.
  */
 const C = {
-  lit: '#FFD60A', // bright yellow — lamplight
-  busyDark: '#FF375F', // vivid red — dark AND busy
-  moderate: '#8B5CF6', // violet — dark, some traffic
-  quietDark: '#3E4A63', // slate — dark, nobody walks it
-  muted: '#232838', // off-route, when a walk is being shown
-  bulbCore: '#FFF3B0', // the safer route itself
-  bulbGlow: '#FFB300',
+  lit: '#F0A63C', // warm amber — lamplight, not school-bus yellow
+  busyDark: '#F04E6E', // rose — dark AND busy
+  moderate: '#8E76D9', // muted violet — dark, some traffic
+  quietDark: '#4B4B52', // neutral grey — dark, nobody walks it
+  muted: '#2C2C31', // off-route, when a walk is being shown
+  bulbCore: '#FFE3B0', // the safer route itself
+  bulbGlow: '#E8901F',
 } as const;
 
 function segColor(risk: number, darkness: number): string {
@@ -118,6 +119,7 @@ export function DarkZoneMap() {
   const hoverRef = useRef<string | null>(null);
   const focusRef = useRef<Set<number> | null>(null);
   const planRef = useRef<RoutePair | null>(null);
+  const resizeObs = useRef<ResizeObserver | null>(null);
 
   const [places, setPlaces] = useState<Place[]>([]);
   const [from, setFrom] = useState('');
@@ -209,6 +211,17 @@ export function DarkZoneMap() {
         void openPath(ev.latlng.lat, ev.latlng.lng);
       });
 
+      /*
+       * Leaflet caches its container size and only recomputes it when told.
+       * Collapsing the agent dock widens the map by 330px, and without this the
+       * newly exposed strip never gets tiles — it just sits blank white against
+       * an otherwise dark map. A ResizeObserver covers every cause: the dock,
+       * the mobile sheet, and the window itself.
+       */
+      const ro = new ResizeObserver(() => m.invalidateSize({ animate: false }));
+      if (holder.current) ro.observe(holder.current);
+      resizeObs.current = ro;
+
       setPlaces(data.places);
       const pick = (want: string, kind: Place['kind']) =>
         data.places.find((p) => p.name.toLowerCase().includes(want))?.name ??
@@ -221,6 +234,8 @@ export function DarkZoneMap() {
 
     return () => {
       cancelled = true;
+      resizeObs.current?.disconnect();
+      resizeObs.current = null;
       map.current?.remove();
       map.current = null;
     };
@@ -520,24 +535,13 @@ export function DarkZoneMap() {
       {/* Desktop: a column down the left. Phone: a sheet along the bottom that
           never covers more than half the map, because the map is the point. */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1000] flex max-h-[48dvh] flex-col gap-3 overflow-y-auto p-3 pr-[4.75rem] sm:inset-y-0 sm:right-auto sm:max-h-none sm:w-full sm:max-w-sm sm:p-4 sm:pr-4">
-        <div className="pointer-events-auto rounded-xl border bg-card/95 p-4 shadow-lg backdrop-blur">
-          <div className="mb-3 flex items-baseline justify-between">
-            <h2 className="text-sm font-semibold">Plan a night walk</h2>
-            {stats ? (
-              <span className="text-[11px] text-muted-foreground">
-                {stats.hostels} blocks · {stats.destinations} places
-              </span>
-            ) : null}
+        <div className="pointer-events-auto rounded-xl border bg-card/95 p-3 shadow-lg backdrop-blur">
+          <div className="flex items-center gap-2">
+            <PlaceSelect places={places} value={from} onChange={setFrom} />
+            <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
+            <PlaceSelect places={places} value={to} onChange={setTo} />
           </div>
-          <div className="space-y-2">
-            <label className="block text-xs text-muted-foreground">
-              From
-              <PlaceSelect places={places} value={from} onChange={setFrom} />
-            </label>
-            <label className="block text-xs text-muted-foreground">
-              To
-              <PlaceSelect places={places} value={to} onChange={setTo} />
-            </label>
+          <div className="mt-2 space-y-2">
             <Button className="w-full" onClick={findRoute} disabled={!ready || loading || from === to}>
               {loading ? 'Routing…' : 'Find the safer walk'}
             </Button>
@@ -569,19 +573,17 @@ export function DarkZoneMap() {
 
         {stats && !selected ? (
           <div className="panel-in pointer-events-auto rounded-xl border bg-card/95 p-4 shadow-lg backdrop-blur">
-            <h3 className="mb-2 text-sm font-semibold">This campus after dark</h3>
             <dl className="space-y-1.5 text-xs">
-              <Row label="Mapped" value={`${stats.totalKm} km`} />
-              <Row label="Unlit" value={`${stats.darkKm} km (${stats.darkPct}%)`} tone="amber" />
+              <Row label="Unlit" value={`${stats.darkKm} km`} tone="amber" />
               <Row
-                label="Busy AND dark"
-                value={`${stats.highRiskSegments} paths · ${stats.highRiskKm} km`}
+                label="Unlit and busy"
+                value={`${stats.highRiskKm} km`}
                 tone="red"
               />
               {reports > 0 ? <Row label="Your reports" value={`${reports}`} tone="green" /> : null}
             </dl>
             <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-              Only the third row is a safety problem. The rest is unlit ground nobody walks.
+              Only the second line is a safety problem — the rest is unlit ground nobody walks.
             </p>
           </div>
         ) : null}
