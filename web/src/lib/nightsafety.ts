@@ -307,6 +307,36 @@ const TRAFFIC_FLOOR: Record<SurveyTraffic, [number, number]> = {
   low: [0, 0.06],
 };
 
+/**
+ * Foot traffic in words, as percentiles of THIS network.
+ *
+ * Exposure is a unitless relative index and its distribution is severely
+ * skewed — median 0.011, p95 0.22 — so any absolute threshold puts almost the
+ * whole campus in one bucket and the label stops discriminating. Fixed cutoffs
+ * of 0.45/0.15 filed 99% of segments as "quiet", including the paths at the top
+ * of the repair queue.
+ *
+ * Derived from the graph at load time, so "busy" keeps meaning *busy for this
+ * campus* rather than a number that silently stops applying if the graph is
+ * ever rebuilt.
+ */
+const EXPOSURE_BANDS = (() => {
+  const sorted = EDGES.map((e) => e.exposure).sort((a, b) => a - b);
+  const at = (p: number) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))];
+  return { busy: at(0.95), some: at(0.75) };
+})();
+
+export function exposureBand(exposure: number): 'busy' | 'some' | 'quiet' {
+  if (exposure >= EXPOSURE_BANDS.busy) return 'busy';
+  if (exposure >= EXPOSURE_BANDS.some) return 'some';
+  return 'quiet';
+}
+
+/** The same word the surveyor picks from, so the table and the field agree. */
+export function exposureLabel(exposure: number): string {
+  return { busy: 'Busy', some: 'Some', quiet: 'Quiet' }[exposureBand(exposure)];
+}
+
 function effectiveExposure(e: Edge): number {
   const t = SURVEYS.get(e.idx)?.traffic;
   if (!t) return e.exposure;

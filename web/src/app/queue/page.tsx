@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { repairQueue, areaStats, loadAll } from '@/lib/nightsafety';
+import { repairQueue, areaStats, loadAll, exposureLabel } from '@/lib/nightsafety';
 
 // Citizen reports re-rank this list at runtime, so it must not be prerendered
 // at build time — a static page would show the pre-report ordering forever.
@@ -73,8 +73,14 @@ export default async function QueuePage() {
                 <TableCell className="text-right tabular-nums text-muted-foreground">
                   {q.meters} m
                 </TableCell>
-                <TableCell className="text-right tabular-nums text-muted-foreground">
-                  {q.avgExposure.toFixed(3)}
+                {/*
+                  Words, not 0.234. The raw exposure figure is a modelled index
+                  with no unit, and printing it to three decimals claims a
+                  precision this does not have. The bands are percentiles of
+                  this network — see exposureBand.
+                */}
+                <TableCell className="text-right text-muted-foreground">
+                  {exposureLabel(q.avgExposure)}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center justify-end gap-2">
@@ -93,6 +99,12 @@ export default async function QueuePage() {
             ))}
           </TableBody>
         </Table>
+        {queue.length === 0 ? (
+          <p className="p-6 text-center text-sm text-muted-foreground">
+            Nothing ranked yet — no unlit stretch carries enough foot traffic to be worth
+            queueing. Report or survey a dark path and it will appear here.
+          </p>
+        ) : null}
         </div>
       </div>
     </AppShell>

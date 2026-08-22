@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Map as LMap, LayerGroup, Canvas } from 'leaflet';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Flag, MapPin, Sparkles } from 'lucide-react';
 import { RouteStats } from './RouteStats';
 import { PathInspector, type PathInfo, type SurveyPatch } from './PathInspector';
 import { SurveyorBar } from './SurveyorBar';
@@ -1016,40 +1016,59 @@ export function DarkZoneMap() {
         ) : null}
       </div>
 
-      <div className="absolute right-3 top-3 z-[1000] flex flex-col items-end gap-2 sm:right-4 sm:top-4">
-        {/* The demo move: strip the map to the 0.2 km that is the whole point. */}
-        <Button
-          size="sm"
-          variant={problemsOnly ? 'default' : 'secondary'}
-          disabled={!ready}
-          onClick={() => setProblemsOnly((v) => !v)}
-        >
-          {problemsOnly ? 'Showing problems only' : 'Problems only'}
-        </Button>
-        <Button
-          size="sm"
-          variant={mode === 'select' ? 'default' : 'secondary'}
-          disabled={!ready}
-          onClick={() => toggleMode('select')}
-        >
-          {mode === 'select' ? 'Tap a path' : 'Report a path'}
-          {reports > 0 ? ` (${reports})` : ''}
-        </Button>
-        {surveyor.authorised ? (
-          <Button
-            size="sm"
-            variant={mode === 'place' ? 'default' : 'secondary'}
+      {/*
+       * One panel, fixed width, stable labels.
+       *
+       * These were four free-floating buttons of four different widths, and the
+       * active label swapped to a longer instruction ("Tap map to add · pin to
+       * edit") so the whole stack changed shape on every click. Grouping them
+       * gives the map one place where controls live; the instruction moved to a
+       * hint line underneath, which is where an instruction belongs anyway.
+       */}
+      <div className="absolute right-3 top-3 z-[1000] flex w-[186px] flex-col items-stretch gap-2 sm:right-4 sm:top-4">
+        <div className="rounded-xl border bg-card/95 p-1.5 shadow-lg backdrop-blur">
+          <MapControl
+            icon={<Sparkles className="size-3.5" />}
+            label="Problems only"
+            active={problemsOnly}
             disabled={!ready}
-            onClick={() => toggleMode('place')}
-          >
-            {mode === 'place' ? 'Tap map to add · pin to edit' : 'Map a point'}
-            {checkpoints.length > 0 ? ` (${checkpoints.length})` : ''}
-          </Button>
+            onClick={() => setProblemsOnly((v) => !v)}
+          />
+          <div className="my-1.5 border-t" />
+          <MapControl
+            icon={<Flag className="size-3.5" />}
+            label="Report a path"
+            count={reports}
+            active={mode === 'select'}
+            disabled={!ready}
+            onClick={() => toggleMode('select')}
+          />
+          {surveyor.authorised ? (
+            <MapControl
+              icon={<MapPin className="size-3.5" />}
+              label="Map a point"
+              count={checkpoints.length}
+              active={mode === 'place'}
+              disabled={!ready}
+              onClick={() => toggleMode('place')}
+            />
+          ) : null}
+        </div>
+
+        {mode !== 'none' ? (
+          <p className="panel-in rounded-lg border bg-card/95 px-2.5 py-1.5 text-[11px] leading-snug text-muted-foreground shadow-lg backdrop-blur">
+            {mode === 'select'
+              ? 'Tap any path to see what we know about it.'
+              : 'Tap the map to add a point — or a pin to edit it.'}
+          </p>
         ) : null}
-        <SurveyorBar surveyor={surveyor} />
+
+        <div className="flex justify-end">
+          <SurveyorBar surveyor={surveyor} />
+        </div>
       </div>
 
-      <div className="absolute bottom-4 right-16 z-[1000] hidden flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-card/95 px-3 py-2 text-[11px] text-muted-foreground shadow-lg backdrop-blur sm:flex">
+      <div className="absolute bottom-20 right-4 z-[1000] hidden max-w-[calc(100%-1.5rem)] flex-wrap items-center justify-end gap-x-3 gap-y-1 rounded-lg border bg-card/95 px-3 py-2 text-[11px] text-muted-foreground shadow-lg backdrop-blur sm:flex lg:bottom-4 lg:right-16">
         <Legend color={problemsOnly ? C.ghost : C.lit} label={problemsOnly ? 'lit (hidden)' : 'lit'} />
         <Legend color={C.dim} label="dim" />
         <Legend color={C.dark} label="dark" />
@@ -1065,6 +1084,47 @@ export function DarkZoneMap() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * One row of the map's control panel.
+ *
+ * Full width with the label left and the count right, so the buttons form a
+ * column rather than a ragged pile, and a count appearing does not resize
+ * anything.
+ */
+function MapControl({
+  icon,
+  label,
+  count,
+  active,
+  disabled,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  count?: number;
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={active}
+      className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-colors disabled:pointer-events-none disabled:opacity-40 ${
+        active
+          ? 'bg-primary/15 font-medium text-primary'
+          : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+      }`}
+    >
+      {icon}
+      <span className="truncate">{label}</span>
+      {count ? <span className="ml-auto tabular-nums opacity-70">{count}</span> : null}
+    </button>
   );
 }
 

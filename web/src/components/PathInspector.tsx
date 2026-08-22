@@ -19,6 +19,8 @@ export type PathInfo = {
   source: string;
   surveyed?: boolean;
   exposure: number;
+  /** Foot traffic in words. The raw index is not meaningful on its own. */
+  exposureLabel?: string;
   risk: number;
   lat: number;
   lng: number;
@@ -143,7 +145,8 @@ export function PathInspector({
         </div>
         <Consensus dark={info.darkReports} lit={info.litReports} />
         <p className="text-[11px] text-muted-foreground">
-          {ORIGIN[info.source] ?? info.source} · foot traffic {info.exposure.toFixed(2)}
+          {ORIGIN[info.source] ?? info.source} · {(info.exposureLabel ?? '').toLowerCase() || 'unknown'}{' '}
+          foot traffic
         </p>
       </div>
 

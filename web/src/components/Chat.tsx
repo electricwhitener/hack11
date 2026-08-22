@@ -9,22 +9,9 @@ import { Chart, type ChartSpec } from './Chart';
 import { AgentStatus } from './agent/AgentStatus';
 import { toolLabel } from './agent/toolLabels';
 import { useChatSession } from './agent/ChatProvider';
-import { useNotifications } from '@/components/providers/notifications';
-
-/**
- * Starter prompts. An empty chat box with no examples is the single most
- * common reason a demo stalls — replace these with ones that show off whatever
- * the problem statement turns out to be.
- */
-const SUGGESTIONS = [
-  'Walking from B3 Block to zanak at 11pm — is there a safer way?',
-  'Which paths on campus should be lit first?',
-  'How bad is this campus after dark?',
-];
 
 export function Chat() {
   const [input, setInput] = useState('');
-  const { push } = useNotifications();
   const { messages, sendMessage, status, addToolApprovalResponse, error } = useChatSession();
 
   const busy = status === 'submitted' || status === 'streaming';
@@ -39,43 +26,26 @@ export function Chat() {
     <div className="mx-auto flex h-full max-w-3xl flex-col">
       <div className="flex-1 space-y-5 overflow-y-auto p-4">
         {messages.length === 0 && (
-          <div className="mx-auto mt-20 max-w-md text-center">
-            <h2 className="text-lg font-medium">Where are you walking tonight?</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              I can compare your route against a better-lit one, explain which streets
-              carry the most night foot traffic, and rank what the corporation should
-              repair first — using computed figures, never guesses.
+          /*
+           * Deliberately bare: a heading, one line, nothing to click.
+           *
+           * The starter prompts went because half of them demonstrated nothing
+           * — "how bad is this campus after dark?" reads as an opinion question
+           * and invites a paragraph, when the thing worth showing is the agent
+           * reading the same computed numbers the map is drawn from. A canned
+           * prompt also frames the agent as the product; it is not. The map,
+           * the routing and the queue work with it switched off.
+           *
+           * The "Try a proactive alert" button went with them: it pushed a
+           * fabricated notification, which is the one thing this product must
+           * never be caught doing on camera.
+           */
+          <div className="mx-auto mt-24 max-w-xs text-center">
+            <h2 className="text-base font-medium">Ask about this map</h2>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+              Routes, foot traffic, and what to repair first — answered from the
+              computed model, not a guess.
             </p>
-
-            <div className="mt-6 grid gap-2 text-left">
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => sendMessage({ text: s })}
-                  disabled={busy}
-                  className="rounded-lg border bg-card px-3.5 py-2.5 text-sm text-muted-foreground transition hover:border-foreground/20 hover:text-foreground disabled:opacity-50"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-
-            {/* Demo trigger for the proactive-notification pattern. Delete once
-                a real event source pushes notifications. */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mt-4 text-xs text-muted-foreground"
-              onClick={() =>
-                push({
-                  title: 'Agent noticed something',
-                  body: 'This is how a proactive alert appears. Check the bell.',
-                  kind: 'warning',
-                })
-              }
-            >
-              Try a proactive alert
-            </Button>
           </div>
         )}
 
