@@ -64,7 +64,9 @@ export function AgentDock() {
       </aside>
 
       {/* Mobile: a button over the map that opens the agent full-height. */}
-      <div className="absolute bottom-4 right-4 z-[1200] lg:hidden">
+      {/* z-30 clears the isolated map subtree; the Sheet itself opens above
+          this at z-50 when triggered. */}
+      <div className="absolute bottom-4 right-3 z-30 lg:hidden">
         <Sheet>
           <SheetTrigger render={<Button size="lg" className="rounded-full shadow-lg" />}>
             <MessageSquare className="size-4" />

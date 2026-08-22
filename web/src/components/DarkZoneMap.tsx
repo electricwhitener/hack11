@@ -197,7 +197,12 @@ export function DarkZoneMap() {
 
       m.on('click', (ev: L.LeafletMouseEvent) => {
         if (modeRef.current === 'none') return;
-        if (!spanAt(ev.latlng.lat, ev.latlng.lng)) return;
+        const span = spanAt(ev.latlng.lat, ev.latlng.lng);
+        if (!span) return;
+        // Touch devices never fire mousemove, so without this a tap selects a
+        // path with no visual confirmation of WHICH path was hit.
+        hoverRef.current = span.indices.join(',');
+        drawHover(span.indices);
         void openPath(ev.latlng.lat, ev.latlng.lng);
       });
 
@@ -480,7 +485,7 @@ export function DarkZoneMap() {
 
       {/* Desktop: a column down the left. Phone: a sheet along the bottom that
           never covers more than half the map, because the map is the point. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1000] flex max-h-[52dvh] flex-col gap-3 overflow-y-auto p-3 sm:inset-y-0 sm:right-auto sm:max-h-none sm:w-full sm:max-w-sm sm:p-4">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1000] flex max-h-[48dvh] flex-col gap-3 overflow-y-auto p-3 pr-[4.75rem] sm:inset-y-0 sm:right-auto sm:max-h-none sm:w-full sm:max-w-sm sm:p-4 sm:pr-4">
         <div className="pointer-events-auto rounded-xl border bg-card/95 p-4 shadow-lg backdrop-blur">
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="text-sm font-semibold">Plan a night walk</h2>

@@ -18,7 +18,12 @@ export default function Home() {
   return (
     <AppShell title={`${s.area} · ${s.totalKm} km mapped`} bleed>
       <div className="flex h-full">
-        <div className="relative min-w-0 flex-1">
+        {/* `isolate` is load-bearing. Leaflet paints its panes at z-index up to
+            800, so the map overlays sit at z-1000+ to clear them. Without a
+            stacking context here those numbers compete with the whole page, and
+            the agent Sheet — portaled to <body> at z-50 — opened UNDERNEATH the
+            map panels. Isolating pins the entire map subtree at one layer. */}
+        <div className="relative isolate min-w-0 flex-1">
           <DarkZoneMap />
         </div>
         <AgentDock />
