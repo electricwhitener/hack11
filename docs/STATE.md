@@ -78,11 +78,11 @@ per hour — it would fail silently mid-demo.
   178/29,136 streets tagged `lit`. This finding shapes the whole product — the
   lighting layer must be collected, not downloaded.
 - `py-service/precompute.py` — pulls OSM, builds the graph, runs the exposure
-  model, bakes `web/src/data/graph.json` (264 KB, 2,348 nodes / 2,590 edges).
+  model, bakes `web/src/data/graph.json` (187 KB, 1,713 nodes / 1,883 edges).
   Runs in ~18s. The live app needs no Python because of this.
 - `web/src/lib/nightsafety.ts` — the computation layer. Dual-weight Dijkstra,
   repair queue, area stats. All deterministic.
-- `/map` — Leaflet dark-zone map, risk-coloured, dual-route comparison.
+- `/` — Leaflet dark-zone map + docked agent, risk-coloured, dual-route comparison.
 - `/queue` — repair queue ranked by risk removed.
 - `tools.ts` — 6 real tools; `runAnalysis`/`commitAction` removed.
 - `prompt.ts` — rewritten; hard rule that the agent never states an uncomputed number.
@@ -107,19 +107,20 @@ court, which is what students actually do at night.
 | Figure | Value |
 |---|---|
 | Headline route | **B3 Block → zanak: 99% less dark walking for +1 m** (382 m dark → 4 m) |
-| Routes with a safer alternative | 165 of 220 hostel→destination pairs, median 27% cut |
-| Repair queue | Top 5 paths remove **32.4%** of campus night risk |
-| Area | 49.7 km mapped, 14.2 km unlit, 56 segments busy AND dark (1.1 km) |
+| Routes with a safer alternative | 184 of 220 hostel→destination pairs, median 12% cut for 3% detour |
+| Repair queue | Top 5 paths remove **19.9%** of campus night risk |
+| Area | 49.7 km mapped, 14.2 km unlit (29%), 42 paths busy AND dark (0.8 km) |
 | Real OSM lighting | 68 segments genuinely tagged (Chandigarh had 0) |
 | Graph | 1,713 nodes / 1,883 edges / 182 KB / 1,430 modelled trips |
 
 ## Done
 - **Agent**: Next.js 16 + AI SDK v7 + Gemini. Streaming, multi-step tool loop,
   human-in-the-loop approval, generative-UI charts, live status line, tool trace.
+  Works signed out.
 - **Quota resilience**: fallback chain across (key x model) pairs.
 - **Auth**: Supabase, Google OAuth + email/password. Confirmed working in prod.
-- **Chat history**: server-side per user in Postgres, RLS-isolated, listed in a
-  persistent sidebar.
+- **Chat history**: server-side per user in Postgres, RLS-isolated, behind the
+  History icon in the agent dock. The ONLY thing signing in buys.
 - **Python sidecar**: FastAPI + pandas/sklearn, upload/analyze/forecast.
   NOT deployed — runs on localhost only.
 - **UI**: shadcn/ui (Base UI), AppShell, dark mode, notifications/toasts.
