@@ -56,7 +56,22 @@ export async function POST(req: Request) {
           // while we can still switch models, rather than mid-stream.
           await result.warnings;
 
-          writer.merge(result.toUIMessageStream());
+          /*
+           * onError here is NOT optional.
+           *
+           * Only the FIRST request of a run is protected by the chain above.
+           * A multi-step tool loop makes one API request per step, so steps 2..n
+           * happen inside this merged stream — after we have committed to a
+           * (key, model) pair and can no longer switch. When one of those later
+           * steps hits quota, toUIMessageStream handles it with its own default
+           * handler, which emits the literal string "An error occurred." That is
+           * the message users were seeing: three tools would run, then the final
+           * answer would die with no explanation and no clue that it was quota.
+           *
+           * Routing it through friendlyError at least tells them what happened
+           * and what to do about it.
+           */
+          writer.merge(result.toUIMessageStream({ onError: friendlyError }));
           return;
         } catch (error) {
           lastError = providerError ?? error;
