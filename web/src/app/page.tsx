@@ -1,33 +1,18 @@
-import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
 import { DarkZoneMap } from '@/components/DarkZoneMap';
 import { AgentDock } from '@/components/agent/AgentDock';
-import { createClient } from '@/lib/supabase/server';
-import { hasSupabase } from '@/lib/supabase/config';
 import { areaStats } from '@/lib/nightsafety';
 
 /**
  * The product is one screen: the map, with the agent beside it.
  *
- * Splitting them across two tabs meant leaving the map to ask a question about
- * the map. Here you can point at a path and ask why it ranks where it does
- * without losing sight of it.
+ * DELIBERATELY NOT AUTH-GATED. This used to redirect signed-out visitors to
+ * /login, which meant anyone opening the link — a judge, someone handed the URL
+ * — hit a signup form before seeing a single thing the product does. The map,
+ * the routing, the repair queue and the agent all work without an account;
+ * signing in only adds saved conversations. Auth is an upgrade, not a gate.
  */
-export default async function Home() {
-  // Without Supabase configured the app runs auth-free: the agent still works,
-  // chat history just is not persisted. This keeps a missing env var from
-  // turning into a broken deploy.
-  if (hasSupabase) {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    // Gate on the server, not the client: a client-side redirect would flash
-    // the whole app to a signed-out visitor before bouncing them.
-    if (!user) redirect('/login');
-  }
-
+export default function Home() {
   const s = areaStats();
 
   return (

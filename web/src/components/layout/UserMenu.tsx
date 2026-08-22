@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
-import { LogOut, Moon, Sun, Monitor, Bell, User } from 'lucide-react';
+import { LogOut, LogIn, Moon, Sun, Monitor, Bell, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -53,7 +53,7 @@ export function UserMenu() {
             GroupLabel, which throws "MenuGroupContext is missing" unless it is
             wrapped in a <Menu.Group>. The throw takes down the whole page. */}
         <div className="truncate px-2 py-1.5 text-xs text-muted-foreground">
-          {email ?? 'Signed out — the agent still works'}
+          {email ?? 'Not signed in'}
         </div>
         <DropdownMenuSeparator />
 
@@ -86,20 +86,36 @@ export function UserMenu() {
           {count > 0 ? `Clear ${count} notification${count > 1 ? 's' : ''}` : 'No notifications'}
         </DropdownMenuItem>
 
-        {hasSupabase && email ? (
+        {hasSupabase ? (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={async () => {
-                await supabase.auth.signOut();
-                // Full page load so the server re-reads the cleared session
-                // cookie; a client transition can render a stale signed-in view.
-                window.location.assign('/login');
-              }}
-            >
-              <LogOut className="size-4" />
-              Sign out
-            </DropdownMenuItem>
+            {email ? (
+              <DropdownMenuItem
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  // Full page load so the server re-reads the cleared session
+                  // cookie; a client transition can render a stale signed-in view.
+                  window.location.assign('/');
+                }}
+              >
+                <LogOut className="size-4" />
+                Sign out
+              </DropdownMenuItem>
+            ) : (
+              <>
+                {/* Signing in is optional — everything works without it. The
+                    only thing it buys is conversations that survive a reload,
+                    so say that rather than implying a wall. */}
+                <div className="px-2 pb-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                  Everything works signed out. Sign in only to keep your
+                  conversations.
+                </div>
+                <DropdownMenuItem onClick={() => window.location.assign('/login')}>
+                  <LogIn className="size-4" />
+                  Sign in
+                </DropdownMenuItem>
+              </>
+            )}
           </>
         ) : null}
       </DropdownMenuContent>

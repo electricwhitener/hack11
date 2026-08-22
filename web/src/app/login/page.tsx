@@ -133,7 +133,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <h1 className="text-center text-2xl font-semibold tracking-tight">{APP_NAME}</h1>
         <p className="mt-2 text-center text-sm text-muted-foreground">
-          Sign in to keep your conversations.
+          Signing in is optional. It only saves your conversations.
         </p>
 
         <Button onClick={signInWithGoogle} disabled={busy} className="mt-8 w-full" size="lg">
@@ -183,6 +183,14 @@ export default function LoginPage() {
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
           New here? Entering an email and password creates your account.
+        </p>
+
+        {/* Nobody has to sign in to use this. Anyone who landed here from a
+            shared link should be one click from the actual product. */}
+        <p className="mt-4 text-center text-xs">
+          <a href="/" className="text-primary underline-offset-4 hover:underline">
+            Skip — take me to the map
+          </a>
         </p>
       </div>
     </div>
