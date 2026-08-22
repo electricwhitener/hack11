@@ -1174,6 +1174,17 @@ export function routePair(
 
   const gate = (e: Edge) => {
     if (isBlocked(e.idx)) return BLOCKED_RULE;
+
+    /*
+     * A placed gate is checked BEFORE the time guard below.
+     *
+     * A gate with no hours is shut at every hour, so it has to apply even when
+     * the walker picked no time — otherwise "always closed" would be honoured
+     * at 11pm and ignored on the default view, which is the one judges see.
+     */
+    const placed = gateFor(e.idx);
+    if (placed && gateShutAt(placed, atMinutes)) return placed;
+
     if (atMinutes === null) return null;
     const { rule, closed } = accessFor(e, atMinutes);
     return closed && rule ? rule : null;
@@ -1418,15 +1429,140 @@ export const PLACES: Place[] = G.landmarks.map((l) => ({
   at: nodeLatLng(l.node),
 }));
 
+/* ------------------------------------------------- landmark corrections
+ *
+ * graph.json is frozen — regenerating it renumbers every segment and orphans
+ * the survey — so a landmark that has closed, moved, or was never really a
+ * destination cannot be removed at source. Corrections overlay it instead,
+ * keyed by the original OSM name. See docs/sql/005_places.sql.
+ */
+
+export type PlaceOverride = { hidden: boolean; displayName: string | null };
+
+type PlaceStore = { map: Map<string, PlaceOverride>; version: number };
+const PS = globalThis as typeof globalThis & { __nightlinePlaces?: PlaceStore };
+const PSTORE: PlaceStore = (PS.__nightlinePlaces ??= { map: new Map(), version: 0 });
+
+const PLACE_REST = `${SUPABASE_URL}/rest/v1/place_overrides`;
+let placeTableMissing = false;
+
+/** Refill landmark corrections from Postgres. Non-fatal on failure. */
+export async function loadPlaceOverrides(): Promise<void> {
+  if (!hasSupabase || placeTableMissing) return;
+  try {
+    const res = await fetch(`${PLACE_REST}?select=name,hidden,display_name`, {
+      headers: HEADERS,
+      cache: 'no-store',
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) {
+      // The migration has not been run. Stop asking rather than retrying on
+      // every request; corrections simply are not available yet.
+      placeTableMissing = true;
+      return;
+    }
+    const rows = (await res.json()) as { name: string; hidden: boolean; display_name: string | null }[];
+    PSTORE.map.clear();
+    for (const r of rows) {
+      PSTORE.map.set(r.name, { hidden: Boolean(r.hidden), displayName: r.display_name });
+    }
+    PSTORE.version += 1;
+  } catch {
+    /* keep whatever this instance already has */
+  }
+}
+
+/**
+ * The landmarks a person should see: hidden ones dropped, renames applied.
+ *
+ * NOTE: zoneOfNode deliberately still reads the full PLACES list. Zones decide
+ * whether a journey is possible at all, and re-deriving them from a shrinking
+ * set of landmarks would let hiding a shop silently reclassify the ground
+ * around it and change which gates a walk has to pass. Hiding corrects what is
+ * SHOWN and offered as a destination, not the shape of the campus.
+ */
+export function visiblePlaces(): Place[] {
+  if (PSTORE.map.size === 0) return PLACES;
+  const out: Place[] = [];
+  for (const p of PLACES) {
+    const o = PSTORE.map.get(p.name);
+    if (o?.hidden) continue;
+    out.push(o?.displayName ? { ...p, name: o.displayName } : p);
+  }
+  return out;
+}
+
+/** Corrections as stored, for the surveyor UI to show what has been changed. */
+export function placeOverrides(): Record<string, PlaceOverride> {
+  return Object.fromEntries(PSTORE.map);
+}
+
+export async function savePlaceOverride(
+  name: string,
+  patch: Partial<PlaceOverride>,
+): Promise<boolean> {
+  if (!hasSupabase) return false;
+  const prev = PSTORE.map.get(name);
+  const next: PlaceOverride = {
+    hidden: patch.hidden !== undefined ? patch.hidden : (prev?.hidden ?? false),
+    displayName: patch.displayName !== undefined ? patch.displayName : (prev?.displayName ?? null),
+  };
+  PSTORE.map.set(name, next);
+  PSTORE.version += 1;
+  try {
+    const res = await fetch(PLACE_REST, {
+      method: 'POST',
+      headers: { ...HEADERS, Prefer: 'resolution=merge-duplicates' },
+      body: JSON.stringify([
+        {
+          name,
+          hidden: next.hidden,
+          display_name: next.displayName,
+          updated_at: new Date().toISOString(),
+        },
+      ]),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.ok) placeTableMissing = false;
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Put a landmark back exactly as OpenStreetMap had it. */
+export async function clearPlaceOverride(name: string): Promise<boolean> {
+  if (!hasSupabase) return false;
+  PSTORE.map.delete(name);
+  PSTORE.version += 1;
+  try {
+    const res = await fetch(`${PLACE_REST}?name=eq.${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+      headers: HEADERS,
+      signal: AbortSignal.timeout(6000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export function findPlace(q: string): Place | undefined {
   const n = q.trim().toLowerCase();
   if (!n) return undefined;
-  return (
-    PLACES.find((p) => p.name.toLowerCase() === n) ??
-    PLACES.find((p) => p.name.toLowerCase().replace(/\s+/g, '') === n.replace(/\s+/g, '')) ??
-    PLACES.find((p) => p.name.toLowerCase().includes(n)) ??
-    PLACES.find((p) => n.includes(p.name.toLowerCase()))
-  );
+  // Search the visible list first so a renamed landmark resolves under its new
+  // name, then fall back to every imported name — a route or a saved agent
+  // conversation referring to the original must not break when it is renamed.
+  const pools = [visiblePlaces(), PLACES];
+  for (const pool of pools) {
+    const hit =
+      pool.find((p) => p.name.toLowerCase() === n) ??
+      pool.find((p) => p.name.toLowerCase().replace(/\s+/g, '') === n.replace(/\s+/g, '')) ??
+      pool.find((p) => p.name.toLowerCase().includes(n)) ??
+      pool.find((p) => n.includes(p.name.toLowerCase()));
+    if (hit) return hit;
+  }
+  return undefined;
 }
 
 
@@ -1467,7 +1603,7 @@ export async function loadSurveys(): Promise<void> {
 
 /** Everything a read path needs, in one call. */
 export async function loadAll(): Promise<void> {
-  await Promise.all([loadReports(), loadSurveys()]);
+  await Promise.all([loadReports(), loadSurveys(), loadGates(), loadPlaceOverrides()]);
 }
 
 export type SurveyResult = {
@@ -1629,18 +1765,47 @@ export type Checkpoint = {
   lat: number;
   lng: number;
   note?: string | null;
+  /** null = a marker that constrains nothing. See docs/sql/004_gates.sql. */
+  barrier?: 'hard' | 'permission' | null;
+  closes?: string | null;
+  opens?: string | null;
+  permit?: string | null;
 };
+
+const GATE_COLUMNS = 'id,name,kind,lat,lng,note,barrier,closes,opens,permit';
+const BASE_COLUMNS = 'id,name,kind,lat,lng,note';
+
+/** Set once 004_gates.sql is seen to be missing, so we stop asking for it. */
+let gateColumnsMissing = false;
 
 export async function listCheckpoints(): Promise<Checkpoint[]> {
   if (!hasSupabase) return [];
-  try {
-    const res = await fetch(`${CHECKPOINT_REST}?select=id,name,kind,lat,lng,note&order=name`, {
+
+  const query = async (columns: string) => {
+    const res = await fetch(`${CHECKPOINT_REST}?select=${columns}&order=name`, {
       headers: HEADERS,
       cache: 'no-store',
       signal: AbortSignal.timeout(6000),
     });
-    if (!res.ok) return [];
-    const rows = (await res.json()) as Checkpoint[];
+    return res.ok ? ((await res.json()) as Checkpoint[]) : null;
+  };
+
+  try {
+    /*
+     * Fall back to the base columns if the gate migration has not been run.
+     *
+     * PostgREST 400s the WHOLE select when one column is unknown, so asking for
+     * gate columns against an un-migrated database would return nothing and
+     * every checkpoint would vanish from the map — a far worse failure than
+     * gates simply not being armed yet.
+     */
+    let rows = gateColumnsMissing ? null : await query(GATE_COLUMNS);
+    if (!rows) {
+      gateColumnsMissing = true;
+      rows = await query(BASE_COLUMNS);
+    }
+    if (!rows) return [];
+
     // Rows written before the gate rework carry kinds the editor cannot render
     // — they came back grey with no button selected and no way to tell why.
     // Normalising on read fixes them on screen without a migration.
@@ -1648,6 +1813,122 @@ export async function listCheckpoints(): Promise<Checkpoint[]> {
   } catch {
     return [];
   }
+}
+
+/* --------------------------------------------------------- gate rules
+ *
+ * A placed gate, resolved to the path segments it physically controls.
+ *
+ * Bound by POSITION, not by segment index. Surveys are index-keyed and so are
+ * fragile against a graph regeneration; a gate is a thing standing at a
+ * coordinate, so resolving it geometrically at load time means a rebuilt graph
+ * re-finds it rather than pointing at whatever segment inherited the number.
+ */
+
+/** How close a segment must pass to a gate to be controlled by it. */
+const GATE_REACH_M = 16;
+
+type GateStore = { list: Checkpoint[]; version: number };
+const GC = globalThis as typeof globalThis & { __nightlineGates?: GateStore };
+const GSTORE: GateStore = (GC.__nightlineGates ??= { list: [], version: 0 });
+
+export type GateRule = AccessRule & { name: string; segments: number[] };
+
+let gateCache: { version: number; rules: GateRule[]; bySegment: Map<number, GateRule> } | null = null;
+
+/** Refill placed gates from Postgres. Non-fatal on failure. */
+export async function loadGates(): Promise<void> {
+  if (!hasSupabase) return;
+  const rows = await listCheckpoints();
+  if (!rows.length && GSTORE.list.length) return; // a failed read must not disarm gates
+  GSTORE.list = rows;
+  GSTORE.version += 1;
+}
+
+function buildGates(): { rules: GateRule[]; bySegment: Map<number, GateRule> } {
+  const rules: GateRule[] = [];
+  const bySegment = new Map<number, GateRule>();
+
+  for (const c of GSTORE.list) {
+    if (c.barrier !== 'hard' && c.barrier !== 'permission') continue;
+
+    const at: LatLng = { lat: c.lat, lng: c.lng };
+    const segments: number[] = [];
+    let nearest = -1;
+    let nd = Infinity;
+
+    for (const e of EDGES) {
+      const d = distToSegment(at, G.nodes[e.a], G.nodes[e.b]);
+      if (d < nd) {
+        nd = d;
+        nearest = e.idx;
+      }
+      if (d <= GATE_REACH_M) segments.push(e.idx);
+    }
+    // A gate mapped slightly off the path still controls the path it guards.
+    if (!segments.length && nearest >= 0) segments.push(nearest);
+
+    const always = !c.closes || !c.opens;
+    const rule: GateRule = {
+      name: c.name,
+      match: /^$/, // matched by segment, never by label
+      barrier: c.barrier,
+      closes: c.closes ?? undefined,
+      opens: c.opens ?? undefined,
+      permit: c.permit ?? undefined,
+      segments,
+      note:
+        c.note?.trim() ||
+        (always
+          ? c.barrier === 'hard'
+            ? `${c.name} is always shut — there is no way through it.`
+            : `${c.name} needs ${c.permit || 'permission'} at any hour.`
+          : `${c.name} is shut from ${c.closes} until ${c.opens}.`),
+    };
+
+    rules.push(rule);
+    // First gate on a segment wins; two gates on one path is a mapping error.
+    for (const idx of segments) if (!bySegment.has(idx)) bySegment.set(idx, rule);
+  }
+
+  return { rules, bySegment };
+}
+
+function gates() {
+  if (!gateCache || gateCache.version !== GSTORE.version) {
+    gateCache = { version: GSTORE.version, ...buildGates() };
+  }
+  return gateCache;
+}
+
+/** The gate controlling a segment, if any. */
+export function gateFor(idx: number): GateRule | undefined {
+  return gates().bySegment.get(idx);
+}
+
+/** Every placed gate, for the map and the agent to describe. */
+export function placedGates(): GateRule[] {
+  return gates().rules;
+}
+
+/**
+ * A gate with a barrier but no hours is shut at EVERY hour.
+ *
+ * That is what "authorised personnel only, always closed" means on the ground:
+ * not a schedule but a wall, and it has to hold even when no time is selected.
+ */
+export function gateShutAt(rule: GateRule, minutes: number | null): boolean {
+  if (!rule.closes || !rule.opens) return true;
+  return minutes === null ? false : isClosedAt(rule, minutes);
+}
+
+/** Segments controlled by a gate that is shut at this hour, for the map. */
+export function shutGateSegments(minutes: number | null): number[] {
+  const out: number[] = [];
+  for (const [idx, rule] of gates().bySegment) {
+    if (gateShutAt(rule, minutes) && rule.barrier === 'hard') out.push(idx);
+  }
+  return out;
 }
 
 export async function upsertCheckpoint(c: Partial<Checkpoint>): Promise<Checkpoint | null> {
@@ -1661,6 +1942,14 @@ export async function upsertCheckpoint(c: Partial<Checkpoint>): Promise<Checkpoi
     updated_at: new Date().toISOString(),
   };
   if (c.id) body.id = c.id;
+  // Only send gate columns when the migration is known to be present, so a
+  // save still succeeds against an un-migrated database instead of 400ing.
+  if (!gateColumnsMissing) {
+    body.barrier = c.barrier ?? null;
+    body.closes = c.closes ?? null;
+    body.opens = c.opens ?? null;
+    body.permit = c.permit ?? null;
+  }
   try {
     const res = await fetch(CHECKPOINT_REST, {
       method: 'POST',

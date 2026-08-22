@@ -28,6 +28,12 @@ let checkpointDeleteRows: unknown[] = [];
  * between requests and make merging look broken when it was not.
  */
 const surveyRows = new Map<number, Record<string, unknown>>();
+/** Stand-ins for the checkpoints and place_overrides tables. */
+let checkpointRows: Record<string, unknown>[] = [];
+const placeRows = new Map<string, Record<string, unknown>>();
+/** Simulates 004/005 not having been run yet. */
+let gateColumnsExist = true;
+let placeTableExists = true;
 
 const json = (v: unknown, status = 200) =>
   new Response(JSON.stringify(v), { status, headers: { 'content-type': 'application/json' } });
@@ -59,8 +65,31 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   }
 
   if (url.includes('/checkpoints')) {
+    // PostgREST 400s the whole select when one column does not exist.
+    if (method === 'GET' && !gateColumnsExist && url.includes('barrier')) {
+      return json({ message: 'column checkpoints.barrier does not exist' }, 400);
+    }
+    if (method === 'GET') return json(checkpointRows);
     if (method === 'DELETE') return json(checkpointDeleteRows);
-    if (method === 'POST') return json([{ id: 'cp-1', ...(body as object[])[0] }], 201);
+    if (method === 'POST') {
+      const row = { id: 'cp-1', ...(body as Record<string, unknown>[])[0] };
+      checkpointRows = [...checkpointRows.filter((r) => r.id !== row.id), row];
+      return json([row], 201);
+    }
+  }
+
+  if (url.includes('place_overrides')) {
+    if (!placeTableExists) return json({ message: 'relation does not exist' }, 404);
+    if (method === 'GET') return json([...placeRows.values()]);
+    if (method === 'POST') {
+      for (const r of body as Record<string, unknown>[]) placeRows.set(r.name as string, r);
+      return json([], 201);
+    }
+    if (method === 'DELETE') {
+      const n = decodeURIComponent(/name=eq\.([^&]*)/.exec(url)?.[1] ?? '');
+      placeRows.delete(n);
+      return json([]);
+    }
   }
 
   return json([]);
@@ -212,6 +241,123 @@ async function main() {
     new Request('http://x/api/checkpoints?id=cp-1', { method: 'DELETE' }),
   );
   check('unauthorised delete is refused', noKey.status === 401, `got ${noKey.status}`);
+
+  console.log('\nGATES THAT ACTUALLY GATE');
+  const places = await import('../src/app/api/places/route');
+
+  // A gate sitting on the direct B3 -> Central Library walk.
+  const direct = ns.routePair(ns.findPlace('B3 Block')!.node, ns.findPlace('Central Library')!.node, 1200);
+  check('the direct walk is open at 20:00', direct.status === 'ok', direct.status);
+  const onRoute = direct.safest.segments[Math.floor(direct.safest.segments.length / 2)];
+  const mid = ns.nodeLatLng(ns.edges[onRoute].a);
+
+  checkpointRows = [
+    {
+      id: 'g-1',
+      name: 'VIP Gate',
+      kind: 'gate',
+      lat: mid.lat,
+      lng: mid.lng,
+      note: null,
+      barrier: 'hard',
+      closes: null,
+      opens: null,
+      permit: null,
+    },
+  ];
+  await ns.loadGates();
+
+  check('the gate binds to real segments', (ns.placedGates()[0]?.segments.length ?? 0) > 0);
+  check(
+    'an always-shut gate is shut with NO time selected',
+    ns.gateShutAt(ns.placedGates()[0], null) === true,
+  );
+  check('…and shut at 20:00 too', ns.gateShutAt(ns.placedGates()[0], 1200) === true);
+
+  const walled = ns.routePair(ns.findPlace('B3 Block')!.node, ns.findPlace('Central Library')!.node, 1200);
+  check(
+    'an always-shut gate changes the walk (it acts as a wall)',
+    walled.status !== 'ok' || walled.safest.meters !== direct.safest.meters,
+    `status ${walled.status}, ${walled.safest.meters} m vs ${direct.safest.meters} m`,
+  );
+
+  // A timed gate: shut 21:00-05:00, open at 20:00.
+  checkpointRows[0].closes = '21:00';
+  checkpointRows[0].opens = '05:00';
+  await ns.loadGates();
+  const g = ns.placedGates()[0];
+  check('a timed gate is OPEN at 20:00', ns.gateShutAt(g, 1200) === false);
+  check('a timed gate is SHUT at 23:00', ns.gateShutAt(g, 1380) === true);
+  check('a timed gate is SHUT at 02:00 (window wraps midnight)', ns.gateShutAt(g, 120) === true);
+  check('a timed gate does not apply when no time is chosen', ns.gateShutAt(g, null) === false);
+
+  const openAgain = ns.routePair(ns.findPlace('B3 Block')!.node, ns.findPlace('Central Library')!.node, 1200);
+  check(
+    'the direct walk returns once the gate is open',
+    openAgain.status === 'ok' && openAgain.safest.meters === direct.safest.meters,
+    `${openAgain.status} ${openAgain.safest.meters} m`,
+  );
+
+  const badHours = await checkpoints.POST(
+    post('http://x/api/checkpoints', {
+      name: 'G', kind: 'gate', lat: 26.84, lng: 75.56, barrier: 'hard', closes: '25:99', opens: '05:00',
+    }),
+  );
+  check('a malformed time is rejected', badHours.status === 400, `got ${badHours.status}`);
+  const halfWindow = await checkpoints.POST(
+    post('http://x/api/checkpoints', {
+      name: 'G', kind: 'gate', lat: 26.84, lng: 75.56, barrier: 'hard', closes: '21:00',
+    }),
+  );
+  check('half a window is rejected', halfWindow.status === 400, `got ${halfWindow.status}`);
+
+  console.log('\nUN-MIGRATED DATABASE STILL WORKS');
+  gateColumnsExist = false;
+  const legacy = await checkpoints.GET();
+  const legacyBody = (await legacy.json()) as { checkpoints: unknown[] };
+  check(
+    'checkpoints still load without 004 (they must not vanish)',
+    legacyBody.checkpoints.length > 0,
+    JSON.stringify(legacyBody).slice(0, 120),
+  );
+  gateColumnsExist = true;
+
+  console.log('\nCORRECTING AN IMPORTED LANDMARK');
+  const zanak = ns.PLACES.find((p) => /zanak/i.test(p.name))?.name;
+  check('zanak is an imported landmark', Boolean(zanak), String(zanak));
+
+  const notReal = await places.POST(post('http://x/api/places', { name: 'Nowhere At All' }));
+  check('a landmark that was never imported is rejected', notReal.status === 404, `got ${notReal.status}`);
+
+  const renamed = await places.POST(post('http://x/api/places', { name: zanak, displayName: 'Zanak Cafe' }));
+  check('rename accepted', renamed.status === 200, `got ${renamed.status}`);
+  check(
+    'the new name is what the map is given',
+    ns.visiblePlaces().some((p) => p.name === 'Zanak Cafe'),
+  );
+  check('the OLD name still resolves for saved routes', ns.findPlace(zanak!)?.node !== undefined);
+  check('the new name resolves too', ns.findPlace('Zanak Cafe')?.node !== undefined);
+
+  const hidden = await places.POST(post('http://x/api/places', { name: zanak, hidden: true }));
+  check('hide accepted', hidden.status === 200, `got ${hidden.status}`);
+  check('a hidden landmark leaves the list', !ns.visiblePlaces().some((p) => p.name === zanak));
+  check(
+    'hiding does NOT shrink the imported set',
+    ns.PLACES.some((p) => p.name === zanak),
+  );
+  const before = ns.zoneOfNode(ns.findPlace('B3 Block')!.node);
+  check('zones still resolve with a landmark hidden', before === 'hostel', before);
+
+  const restored = await places.DELETE(
+    new Request(`http://x/api/places?name=${encodeURIComponent(zanak!)}`, { method: 'DELETE', headers: KEY }),
+  );
+  check('restore accepted', restored.status === 200, `got ${restored.status}`);
+  check('the landmark is back under its imported name', ns.visiblePlaces().some((p) => p.name === zanak));
+
+  const anonPlace = await places.POST(
+    post('http://x/api/places', { name: zanak, hidden: true }, { 'content-type': 'application/json' }),
+  );
+  check('unauthorised landmark edit is refused', anonPlace.status === 401, `got ${anonPlace.status}`);
 
   console.log(failures === 0 ? '\nAll checks passed.\n' : `\n${failures} CHECK(S) FAILED\n`);
   process.exit(failures === 0 ? 0 : 1);

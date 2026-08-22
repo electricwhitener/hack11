@@ -1,5 +1,14 @@
 import { NextResponse } from 'next/server';
-import { edges, nodeLatLng, areaStats, meta, PLACES, loadAll, tunnelSegments, blockedSegments } from '@/lib/nightsafety';
+import {
+  edges,
+  nodeLatLng,
+  areaStats,
+  meta,
+  visiblePlaces,
+  loadAll,
+  tunnelSegments,
+  blockedSegments,
+} from '@/lib/nightsafety';
 
 /**
  * Slim drawing payload for the map.
@@ -26,7 +35,8 @@ export async function GET() {
     segments,
     stats,
     area: meta.area,
-    places: PLACES,
+    // Hidden and renamed landmarks are corrected here, not in graph.json.
+    places: visiblePlaces(),
     tunnels: tunnelSegments(),
     blocked: blockedSegments(),
   });

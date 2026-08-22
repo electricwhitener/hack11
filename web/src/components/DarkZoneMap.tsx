@@ -9,6 +9,7 @@ import { RouteStats } from './RouteStats';
 import { PathInspector, type PathInfo, type SurveyPatch } from './PathInspector';
 import { SurveyorBar } from './SurveyorBar';
 import { CheckpointEditor, type Checkpoint } from './CheckpointEditor';
+import { PlaceEditor, type PlaceEdit } from './PlaceEditor';
 import { kindColour, DEFAULT_KIND } from '@/lib/checkpointKinds';
 import { useSurveyor } from '@/lib/useSurveyor';
 
@@ -92,12 +93,20 @@ const C = {
   tunnel: '#5B9DFF', // clear blue: a different KIND of path
   blocked: '#4A4A52', // near-invisible on purpose; it is not a route
   muted: '#2C2C31', // off-route, when a walk is being shown
+  ghost: '#3A3A42', // campus shape only, when problems are isolated
   bulbCore: '#FFE9B8', // the safer route itself
   bulbGlow: '#FF9E1B',
 } as const;
 
-/** Opacity carries hierarchy too: the common case sits back, danger sits forward. */
-const OPACITY = { lit: 0.85, dim: 1, dark: 1 } as const;
+/**
+ * Opacity carries hierarchy too: the common case sits back, danger sits forward.
+ *
+ * 1,500 of 1,883 segments are lit. Drawing them at 0.85 meant four fifths of the
+ * map was bright reassurance, and the 0.2 km this product exists to find had to
+ * compete with it. A lit path is the ABSENCE of a problem — it earns enough
+ * presence to show the shape of the campus and no more.
+ */
+const OPACITY = { lit: 0.26, dim: 0.95, dark: 1 } as const;
 
 /** Thresholds shared with the inspector's wording, so they never disagree. */
 const DIM_AT = 0.35;
@@ -119,8 +128,12 @@ function segOpacity(darkness: number): number {
 function segWeight(exposure: number, darkness: number): number {
   // Weight is the third cue: dark sits thickest, lit thinnest, regardless of
   // how busy the path is. A quiet dark stretch still has to be findable.
-  const base = darkness > DARK_AT ? 2.1 : darkness > DIM_AT ? 1.6 : 1.1;
-  return base + Math.min(exposure, 1) * 2.3;
+  const base = darkness > DARK_AT ? 2.1 : darkness > DIM_AT ? 1.6 : 0.9;
+  // Foot traffic thickens a dark path much more than a lit one. A busy LIT path
+  // is the best case on the whole map — it has no business being one of the
+  // heaviest lines on it, which is what a single shared multiplier did.
+  const spread = darkness > DIM_AT ? 2.3 : 0.9;
+  return base + Math.min(exposure, 1) * spread;
 }
 
 /** Perpendicular distance in metres from a point to a segment. */
@@ -175,6 +188,25 @@ export function DarkZoneMap() {
   const cpLayer = useRef<LayerGroup | null>(null);
   const tunnelsRef = useRef<Set<number>>(new Set());
   const blockedRef = useRef<Set<number>>(new Set());
+  const [problemsOnly, setProblemsOnly] = useState(false);
+  const problemsRef = useRef(false);
+  const placeLayer = useRef<LayerGroup | null>(null);
+  const [placeDraft, setPlaceDraft] = useState<PlaceEdit | null>(null);
+  /** Leaflet binds marker handlers once, so these must be read through refs. */
+  const surveyorRef = useRef(false);
+  const renamedRef = useRef<Set<string>>(new Set());
+
+  // Leaflet handlers read the mode through a ref, so keep it in step and
+  // repaint — the segments are already loaded, only their styling changes.
+  useEffect(() => {
+    surveyorRef.current = surveyor.authorised;
+  }, [surveyor.authorised]);
+
+  useEffect(() => {
+    problemsRef.current = problemsOnly;
+    if (segRef.current.length) paintSegments(segRef.current, focusRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [problemsOnly]);
 
   // Losing surveyor rights must leave surveyor mode. The "Map a point" button
   // disappears on sign-out but `mode` did not change, so the map kept opening a
@@ -184,6 +216,7 @@ export function DarkZoneMap() {
       modeRef.current = 'none';
       setMode('none');
       setDraft(null);
+      setPlaceDraft(null);
     }
   }, [surveyor.authorised]);
 
@@ -221,6 +254,7 @@ export function DarkZoneMap() {
       baseLayer.current = L.layerGroup().addTo(m);
       hoverLayer.current = L.layerGroup().addTo(m);
       routeLayer.current = L.layerGroup().addTo(m);
+      placeLayer.current = L.layerGroup().addTo(m);
       cpLayer.current = L.layerGroup().addTo(m);
       void refreshCheckpoints();
 
@@ -239,17 +273,7 @@ export function DarkZoneMap() {
       setStats(data.stats);
       paintSegments(data.segments, null);
 
-      for (const p of data.places) {
-        L.circleMarker([p.at.lat, p.at.lng], {
-          radius: p.kind === 'hostel' ? 5 : 4,
-          color: p.kind === 'hostel' ? '#93c5fd' : '#cbd5e1',
-          fillColor: p.kind === 'hostel' ? '#3b82f6' : '#94a3b8',
-          fillOpacity: 0.9,
-          weight: 1.5,
-        })
-          .bindTooltip(p.name, { direction: 'top' })
-          .addTo(m);
-      }
+      drawPlaces(data.places);
 
       // Hover preview: highlight the whole path the cursor is over, so you can
       // see what you are about to pick before committing to it.
@@ -296,6 +320,9 @@ export function DarkZoneMap() {
       setFrom(pick('b3 block', 'hostel'));
       setTo(pick('zanak', 'dest'));
       setReady(true);
+      // After the defaults, so valid picks are not clobbered. This is only for
+      // which landmarks carry a correction — the list itself came with the graph.
+      void refreshPlaces();
     })();
 
     return () => {
@@ -427,6 +454,19 @@ export function DarkZoneMap() {
           opacity: 0.85,
           dashArray: '6 4',
         }).addTo(baseLayer.current);
+        continue;
+      }
+
+      /*
+       * Problems only: everything that is not at least dim drops to a ghost.
+       *
+       * Not hidden — drawn faint. An empty map with 19 red segments floating on
+       * it says nothing about WHERE they are; the campus outline is what makes
+       * them mean something. Blocked stretches and the underpass are handled
+       * above and stay visible, because they are constraints, not clutter.
+       */
+      if (problemsRef.current && darkness <= DIM_AT) {
+        L.polyline(line, { color: C.ghost, weight: 0.7, opacity: 0.45 }).addTo(baseLayer.current);
         continue;
       }
 
@@ -642,6 +682,7 @@ export function DarkZoneMap() {
     modeRef.current = value;
     setSelected(null);
     setDraft(null);
+    setPlaceDraft(null);
     hoverRef.current = null;
     drawHover(null);
   }
@@ -653,6 +694,93 @@ export function DarkZoneMap() {
       drawCheckpoints(d.checkpoints ?? []);
     } catch {
       /* map still works without them */
+    }
+  }
+
+  /**
+   * The imported OpenStreetMap landmarks.
+   *
+   * In a layer group rather than straight on the map so hiding or renaming one
+   * can redraw them without tearing down the whole map.
+   */
+  function drawPlaces(list: Place[]) {
+    const L = LRef.current;
+    const layer = placeLayer.current;
+    if (!L || !layer) return;
+    layer.clearLayers();
+
+    for (const p of list) {
+      const marker = L.circleMarker([p.at.lat, p.at.lng], {
+        radius: p.kind === 'hostel' ? 5 : 4,
+        color: p.kind === 'hostel' ? '#93c5fd' : '#cbd5e1',
+        fillColor: p.kind === 'hostel' ? '#3b82f6' : '#94a3b8',
+        fillOpacity: 0.9,
+        weight: 1.5,
+      }).bindTooltip(p.name, { direction: 'top' });
+
+      marker.on('click', (ev: L.LeafletMouseEvent) => {
+        // Same Leaflet trap as the checkpoint pins: only L.DomEvent sets the
+        // flag the map checks, so without this the map handler runs too.
+        L.DomEvent.stopPropagation(ev);
+        if (modeRef.current === 'place' && surveyorRef.current) {
+          setDraft(null);
+          setPlaceDraft({ name: p.name, kind: p.kind, renamed: renamedRef.current.has(p.name) });
+        }
+      });
+      marker.addTo(layer);
+    }
+  }
+
+  async function refreshPlaces() {
+    try {
+      const d = await fetch('/api/places').then((r) => r.json());
+      const list: Place[] = d.places ?? [];
+      renamedRef.current = new Set(Object.keys(d.overrides ?? {}));
+      setPlaces(list);
+      drawPlaces(list);
+      // A hidden landmark must not stay selected in a picker.
+      setFrom((v) => (list.some((p) => p.name === v) ? v : (list[0]?.name ?? '')));
+      setTo((v) => (list.some((p) => p.name === v) ? v : (list[1]?.name ?? '')));
+    } catch {
+      /* the map still works with the landmarks it already has */
+    }
+  }
+
+  async function savePlace(body: Record<string, unknown>, ok: string) {
+    try {
+      const res = await fetch('/api/places', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...surveyor.headers() },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error ?? 'Could not save that.');
+        return;
+      }
+      setPlaceDraft(null);
+      await refreshPlaces();
+      toast.success(ok);
+    } catch {
+      toast.error('Could not save that.');
+    }
+  }
+
+  async function restorePlace(name: string) {
+    try {
+      const res = await fetch(`/api/places?name=${encodeURIComponent(name)}`, {
+        method: 'DELETE',
+        headers: surveyor.headers(),
+      });
+      if (!res.ok) {
+        toast.error('Could not restore that landmark.');
+        return;
+      }
+      setPlaceDraft(null);
+      await refreshPlaces();
+      toast.success(`${name} restored as imported`);
+    } catch {
+      toast.error('Could not restore that landmark.');
     }
   }
 
@@ -835,6 +963,21 @@ export function DarkZoneMap() {
           </div>
         ) : null}
 
+        {placeDraft ? (
+          <div className="pointer-events-auto">
+            <PlaceEditor
+              key={placeDraft.name}
+              place={placeDraft}
+              onRename={(name, displayName) =>
+                savePlace({ name, displayName }, `Renamed to ${displayName}`)
+              }
+              onHide={(name) => savePlace({ name, hidden: true }, `${name} hidden`)}
+              onRestore={restorePlace}
+              onCancel={() => setPlaceDraft(null)}
+            />
+          </div>
+        ) : null}
+
         {selected ? (
           <div className="panel-in pointer-events-auto">
             <PathInspector
@@ -874,6 +1017,15 @@ export function DarkZoneMap() {
       </div>
 
       <div className="absolute right-3 top-3 z-[1000] flex flex-col items-end gap-2 sm:right-4 sm:top-4">
+        {/* The demo move: strip the map to the 0.2 km that is the whole point. */}
+        <Button
+          size="sm"
+          variant={problemsOnly ? 'default' : 'secondary'}
+          disabled={!ready}
+          onClick={() => setProblemsOnly((v) => !v)}
+        >
+          {problemsOnly ? 'Showing problems only' : 'Problems only'}
+        </Button>
         <Button
           size="sm"
           variant={mode === 'select' ? 'default' : 'secondary'}
@@ -898,7 +1050,7 @@ export function DarkZoneMap() {
       </div>
 
       <div className="absolute bottom-4 right-16 z-[1000] hidden flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-card/95 px-3 py-2 text-[11px] text-muted-foreground shadow-lg backdrop-blur sm:flex">
-        <Legend color={C.lit} label="lit" />
+        <Legend color={problemsOnly ? C.ghost : C.lit} label={problemsOnly ? 'lit (hidden)' : 'lit'} />
         <Legend color={C.dim} label="dim" />
         <Legend color={C.dark} label="dark" />
         <Legend color={C.tunnel} label="underpass" dashed />

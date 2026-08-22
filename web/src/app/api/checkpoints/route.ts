@@ -20,6 +20,10 @@ export async function POST(req: Request) {
     lat?: number;
     lng?: number;
     note?: string;
+    barrier?: 'hard' | 'permission' | null;
+    closes?: string | null;
+    opens?: string | null;
+    permit?: string | null;
   };
 
   if (!body.name?.trim()) return NextResponse.json({ error: 'A name is required.' }, { status: 400 });
@@ -31,6 +35,23 @@ export async function POST(req: Request) {
   if (body.kind && !isKnownKind(body.kind)) {
     return NextResponse.json({ error: `Unknown kind: ${body.kind}` }, { status: 400 });
   }
+  if (body.barrier && body.barrier !== 'hard' && body.barrier !== 'permission') {
+    return NextResponse.json({ error: `Unknown barrier: ${body.barrier}` }, { status: 400 });
+  }
+  // A half-specified window is worse than none: it would silently mean "always
+  // shut", which is the opposite of what somebody typing one time intends.
+  const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+  for (const [field, v] of [['closes', body.closes], ['opens', body.opens]] as const) {
+    if (v && !HHMM.test(v)) {
+      return NextResponse.json({ error: `${field} must be HH:MM, got ${v}` }, { status: 400 });
+    }
+  }
+  if (Boolean(body.closes) !== Boolean(body.opens)) {
+    return NextResponse.json(
+      { error: 'Give both closes and opens, or neither (neither = always shut).' },
+      { status: 400 },
+    );
+  }
 
   const saved = await upsertCheckpoint({
     id: body.id,
@@ -39,6 +60,10 @@ export async function POST(req: Request) {
     lat: body.lat,
     lng: body.lng,
     note: body.note ?? null,
+    barrier: body.barrier ?? null,
+    closes: body.closes ?? null,
+    opens: body.opens ?? null,
+    permit: body.permit ?? null,
   });
   if (!saved) return NextResponse.json({ error: 'Could not save.' }, { status: 500 });
   return NextResponse.json({ checkpoint: saved });
