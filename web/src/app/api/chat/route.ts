@@ -26,6 +26,47 @@ export const maxDuration = 60;
  */
 const SEARCH_BUDGET_MS = 28_000;
 
+/**
+ * How long ONE attempt may take to prove it will even respond.
+ *
+ * The actual bug behind three back-to-back 504s: `await result.warnings` had
+ * no timeout anywhere. If the underlying request to Google stalls — no error,
+ * no response, just silence — that await sits forever, the SEARCH_BUDGET_MS
+ * check above never gets a turn to run (it only fires BETWEEN loop
+ * iterations, never during one already in flight), and the whole 60 s
+ * maxDuration is spent waiting on one dead attempt before Vercel kills the
+ * function outright. Confirmed by isolating it: the raw provider API answered
+ * in 1 s and loadAll() in 1.5 s while the full request still 504'd at 61 s.
+ *
+ * 9 s comfortably covers every healthy attempt measured (1-6 s) while
+ * guaranteeing at least two more attempts fit inside SEARCH_BUDGET_MS if this
+ * one hangs.
+ */
+const COMMIT_TIMEOUT_MS = 9_000;
+
+/** Races a promise against a deadline, and aborts the in-flight request if it loses. */
+function withDeadline<T>(promise: PromiseLike<T>, ms: number, abort: AbortController): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      // Stop the abandoned request rather than leaving it running unseen —
+      // otherwise a "gave up on" attempt still spends its slot in today's
+      // per-model quota for no benefit to anyone.
+      abort.abort();
+      reject(new Error(`attempt timed out after ${ms}ms waiting to be accepted`));
+    }, ms);
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
+
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
@@ -66,6 +107,8 @@ export async function POST(req: Request) {
         // callback is the only place the 429 is actually visible.
         let providerError: unknown;
 
+        const abort = new AbortController();
+
         try {
           const result = streamText({
             onError: ({ error }) => {
@@ -76,6 +119,7 @@ export async function POST(req: Request) {
             messages: modelMessages,
             tools,
             providerOptions: googleOptions,
+            abortSignal: abort.signal,
             // Each step is a separate API request, so this directly multiplies
             // quota use. Keep it low.
             /*
@@ -91,10 +135,17 @@ export async function POST(req: Request) {
             maxRetries: 0,
           });
 
-          // `warnings` settles once the request is accepted but before the
-          // response finishes. Awaiting it surfaces a 429 or auth failure HERE,
-          // while we can still switch models, rather than mid-stream.
-          await result.warnings;
+          /*
+           * `warnings` settles once the request is accepted but before the
+           * response finishes. Awaiting it surfaces a 429 or auth failure HERE,
+           * while we can still switch models, rather than mid-stream.
+           *
+           * Raced against COMMIT_TIMEOUT_MS: an attempt that never answers this
+           * must not be allowed to hold the whole function hostage. Once this
+           * resolves, the attempt has proven it works, and the deadline no
+           * longer applies — the real answer streams for as long as it takes.
+           */
+          await withDeadline(result.warnings, COMMIT_TIMEOUT_MS, abort);
 
           /*
            * onError here is NOT optional.
@@ -157,7 +208,7 @@ function errorText(error: unknown, depth = 0): string {
  * placed first in the chain silently kills every attempt after it.
  */
 function isRetryableModelError(error: unknown): boolean {
-  return /quota|rate.?limit|RESOURCE_EXHAUSTED|429|not found|404|unavailable|overloaded|503|401|403|PERMISSION_DENIED|API key/i.test(
+  return /quota|rate.?limit|RESOURCE_EXHAUSTED|429|not found|404|unavailable|overloaded|503|401|403|PERMISSION_DENIED|API key|timed out/i.test(
     errorText(error),
   );
 }
