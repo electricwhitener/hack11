@@ -30,7 +30,13 @@ export async function GET() {
       chain: MODEL_CHAIN,
       attempts: MODEL_ATTEMPTS.length,
       approxRequestsPerDay: MODEL_ATTEMPTS.length * 20,
-      primaryModel: MODEL_ID,
+      /*
+       * The model actually tried FIRST, which is the head of the chain — not
+       * MODEL_ID. The chat route walks MODEL_ATTEMPTS, so reporting MODEL_ID
+       * here would quietly name a model the agent never reaches if the two
+       * ever drift apart.
+       */
+      primaryModel: MODEL_CHAIN[0] ?? MODEL_ID,
     },
     auth: { supabaseConfigured: hasSupabase, required: false },
     graph: {
