@@ -515,9 +515,15 @@ export const ACCESS_RULES: AccessRule[] = [
  */
 const EXCLUSIVE_WAYS: { a: RegExp; b: RegExp; note: string }[] = [
   {
-    a: /day.?scholar/i,
+    /*
+     * Every day scholars' entrance, by whatever name it was mapped under.
+     * "VIP Gate" is a second one of these — it is not a gate an outpass opens.
+     * The outpass belongs to the HOSTEL gate, which is a permission barrier and
+     * has nothing to do with this rule.
+     */
+    a: /day.?scholar|vip.?gate/i,
     b: /subway (entrance|exit)/i,
-    note: "The day scholars' gate and the subway are not used by the same person.",
+    note: "A day scholars' entrance and the subway are not used by the same person.",
   },
 ];
 
