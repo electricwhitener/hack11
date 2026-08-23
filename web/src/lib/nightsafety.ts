@@ -1499,9 +1499,22 @@ export function routePair(
     return finish('partial', pair, notesOn(pair.shortest.segments));
   }
 
-  // 4. Shut, or too far off the network to help with. Name what is in the way,
-  //    read off the route that would exist if time did not.
-  return finish('closed', null, notesOn(summarise(ignoringGates).segments));
+  /*
+   * 4. Shut. Name ONLY what is actually shut.
+   *
+   * A route can reach this point solely because a HARD barrier blocks it —
+   * `plan(withPermit)` above already succeeds whenever the only obstacles are
+   * permission gates. So listing the permission gates the route happens to
+   * cross was actively misleading: a walk stopped by a locked fence reported
+   * "the hostel gate needs an outpass" alongside it, and read as though the
+   * hostel gate were shut. It is not. It is passable, with an outpass.
+   *
+   * Only hard barriers explain a closure. If somehow none are found, fall back
+   * to everything rather than showing an unexplained "closed".
+   */
+  const inTheWay = notesOn(summarise(ignoringGates).segments);
+  const shut = inTheWay.filter((c) => c.barrier === 'hard');
+  return finish('closed', null, shut.length ? shut : inTheWay);
 }
 
 export type QueueItem = {

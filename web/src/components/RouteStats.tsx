@@ -63,7 +63,9 @@ export function ClosedNotice({ plan }: { plan: RoutePair }) {
         </p>
       ))}
       <p className="mt-3 rounded-lg bg-muted/50 p-2.5 text-[11px] leading-relaxed text-muted-foreground">
-        Pick an earlier time to see the route, or stay where you are until the gates open at 5am.
+        Only barriers that are actually shut are listed above — a gate you can pass with an
+        outpass never appears here. Pick an earlier time to see the route, or wait until the
+        gates open at 6am.
       </p>
     </div>
   );

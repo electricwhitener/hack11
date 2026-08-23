@@ -422,6 +422,28 @@ async function main() {
   checkpointRows = [];
   await ns.loadGates();
 
+  console.log('');
+  console.log('A CLOSURE NAMES ONLY WHAT IS SHUT');
+  // A hard wall on the direct path, plus a permission gate elsewhere on it.
+  const cl = ns.findPlace('Central Library')!;
+  const wall = ns.nodeLatLng(cl.node);
+  checkpointRows = [
+    { id: 'w-1', name: 'Locked Fence', kind: 'gate', lat: wall.lat, lng: wall.lng,
+      note: null, barrier: 'hard', closes: null, opens: null, permit: null },
+  ];
+  await ns.loadGates();
+  const blocked = ns.routePair(b3.node, cl.node, 4, 1380);
+  console.log(`     -> ${blocked.status}: ${blocked.closures.map((c) => c.label + '[' + c.barrier + ']').join(', ')}`);
+  check('the walk is closed', blocked.status === 'closed', blocked.status);
+  check(
+    'ONLY hard barriers are blamed — an outpass gate is not why it is shut',
+    blocked.closures.every((c) => c.barrier === 'hard'),
+    blocked.closures.map((c) => c.label + '[' + c.barrier + ']').join(', '),
+  );
+  check('and something is named', blocked.closures.length > 0);
+  checkpointRows = [];
+  await ns.loadGates();
+
   console.log(failures === 0 ? '\nAll checks passed.\n' : `\n${failures} CHECK(S) FAILED\n`);
   process.exit(failures === 0 ? 0 : 1);
 }
