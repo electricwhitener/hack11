@@ -283,6 +283,24 @@ Postgres — no network, safe to run mid-survey. Run it after touching any of th
 
 **These will change once survey data lands. Regenerate before quoting them.**
 
+## Round 3 pitch examples (verified on production, hold at every time)
+
+| Walk | Shortest | Safer | Cost | Gain |
+|---|---|---|---|---|
+| **G3 block → Bluedove Mess** | 133 m, 53 m dark | 135 m, **0 m dark** | **+2 m** | **100% less dark** |
+| G3 block → Quess Mess & Gym | 214 m, 58 m dark | 216 m, 5 m dark | +2 m | 91% less dark |
+| G3 block → AB1 | 557 m, 58 m dark | 564 m, 5 m dark | +7 m | 91% less dark |
+| B3 Block → TMA Pai Auditorium | 594 m, 135 m dark | 604 m, 76 m dark | +10 m | 44% less dark |
+
+The first two hold at **every** hour including 23:00. The last two go `closed`
+at 23:00 — see below. Regenerate with the pair scan if survey data changes.
+
+**11pm is currently sealed campus-wide.** `Library` and `Day Scholar's Entrance`
+are both armed `hard` 23:00–06:00; together they close every hostel↔campus
+walk, so no pair returns `permission` at that hour. A library is a destination
+with opening hours, not a wall across a footpath — setting `Library` to *Open
+to all* is what restores the outpass demo.
+
 Time-aware demo sequence (Central Library → B3 Block, walking home):
 `20:00 ok 339 m` · `21:00 ok 432 m` · `23:00 permission — outpass to get back in`
 `02:00 permission` (the window wraps midnight) · `06:00 ok 339 m`
