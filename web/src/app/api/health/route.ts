@@ -22,6 +22,12 @@ export async function GET() {
     ai: {
       keys: API_KEYS.length,
       models: MODEL_CHAIN.length,
+      /*
+       * The ORDER, not just the count. MODEL_CHAIN can be overridden by an env
+       * var, so a change committed here can be silently beaten by one set on
+       * the host — and the only way to know which is live is to ask production.
+       */
+      chain: MODEL_CHAIN,
       attempts: MODEL_ATTEMPTS.length,
       approxRequestsPerDay: MODEL_ATTEMPTS.length * 20,
       primaryModel: MODEL_ID,

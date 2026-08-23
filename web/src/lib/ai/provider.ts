@@ -60,11 +60,34 @@ export const FAST_MODEL_ID = process.env.FAST_MODEL_ID ?? 'gemini-flash-lite-lat
  * moves on when one is exhausted, so a dead combination is invisible to the
  * user — see src/app/api/chat/route.ts.
  *
- * Order matters: best quality first, cheapest last.
+ * ORDER IS MEASURED, NOT ASSUMED. Every model below was timed against the real
+ * tool registry on 23 Aug, one agent turn each, same prompt:
+ *
+ *   gemini-flash-lite-latest    3.0 s
+ *   gemini-3.1-flash-lite       4.3 s
+ *   gemini-3.5-flash-lite       4.3 s
+ *   gemini-3.5-flash            5.8 s   <- primary
+ *   gemini-3.6-flash           43.6 s   <- last resort ONLY
+ *
+ * All five call tools correctly, so the ordering is about latency and prose
+ * quality rather than capability.
+ *
+ * `gemini-3.5-flash` leads because it is the best-writing model that is also
+ * fast, and the agent's job here is to explain a number in words somebody can
+ * read aloud. The lite models answer a second or two quicker but write more
+ * thinly, so they sit behind it as fallbacks rather than ahead of it.
+ *
+ * `gemini-3.6-flash` is NEWER and was second in this chain. It is now last.
+ * Being newer bought nothing measurable — identical tools, an equivalent
+ * answer — and cost 7.5x the latency. At 43.6 s it is also close enough to the
+ * route's 60 s maxDuration that a slow run would not merely be embarrassing on
+ * stage, it would time out. It stays in the chain because it is still 20 more
+ * requests a day, but nothing reaches it until 80 requests have been spent on
+ * the same key.
  */
 export const MODEL_CHAIN = (
   process.env.MODEL_CHAIN ??
-  'gemini-3.5-flash,gemini-3.6-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest'
+  'gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest,gemini-3.6-flash'
 )
   .split(',')
   .map((m) => m.trim())
