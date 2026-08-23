@@ -444,6 +444,47 @@ async function main() {
   checkpointRows = [];
   await ns.loadGates();
 
+  console.log('');
+  console.log('MUTUALLY EXCLUSIVE CROSSINGS');
+  const subSegs = ns.edges.filter((e) => /subway (entrance|exit)/i.test(e.label)).map((e) => e.idx);
+  check('the subway entrance/exit set is found', subSegs.length > 0, String(subSegs.length));
+
+  // Put a day scholars' gate on a segment that is NOT part of the subway.
+  const away = ns.edges.find((e) => !/subway/i.test(e.label) && /road|footpath/i.test(e.label))!;
+  const at = ns.nodeLatLng(away.a);
+  checkpointRows = [
+    { id: 'ds-1', name: "Day Scholar's Entrance", kind: 'gate', lat: at.lat, lng: at.lng,
+      note: null, barrier: null, closes: null, opens: null, permit: null },
+  ];
+  await ns.loadGates();
+  // The point is deliberately NOT armed as a barrier: who may use a crossing is
+  // a fact about the crossing, not about whether it is currently shut.
+  check('an unarmed point is not a barrier', ns.placedGates().length === 0,
+    String(ns.placedGates().length));
+  const dsSegs = ns.exclusiveSetsForTest();
+  check('the exclusion still resolves it', dsSegs.length === 1 && dsSegs[0].a.size > 0,
+    JSON.stringify(dsSegs.map((x) => [x.a.size, x.b.size])));
+
+  const b3n = ns.findPlace('B3 Block')!.node;
+  const libn = ns.findPlace('Central Library')!.node;
+  const withRule = ns.routePair(b3n, libn, 4, 1290);
+  const subSet = new Set(subSegs);
+  const dsSet = dsSegs[0].a;
+  const usesSub = withRule.safest.segments.some((i) => subSet.has(i));
+  const usesDs = withRule.safest.segments.some((i) => dsSet.has(i));
+  console.log(`     -> ${withRule.status}, ${withRule.safest.meters} m | subway:${usesSub} dayScholar:${usesDs}`);
+  check('a route never uses BOTH crossings', !(usesSub && usesDs), `subway=${usesSub} ds=${usesDs}`);
+  check('a route is still produced', withRule.status !== 'closed', withRule.status);
+
+  checkpointRows = [];
+  await ns.loadGates();
+  const without = ns.routePair(b3n, libn, 4, 1290);
+  check(
+    'with no day-scholar gate mapped, the rule is inert and routing is unchanged',
+    without.status === 'ok',
+    without.status,
+  );
+
   console.log(failures === 0 ? '\nAll checks passed.\n' : `\n${failures} CHECK(S) FAILED\n`);
   process.exit(failures === 0 ? 0 : 1);
 }

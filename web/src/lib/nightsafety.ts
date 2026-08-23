@@ -499,6 +499,63 @@ export const ACCESS_RULES: AccessRule[] = [
   },
 ];
 
+/* ------------------------------------------------- mutually exclusive ways
+ *
+ * Two crossings that no single person may use on one journey.
+ *
+ * Both are legal, and neither is shut — so this cannot be expressed as a
+ * barrier. It is a property of WHO is walking. Somebody entering through the
+ * day scholars' gate is by definition not a hosteller, so the subway (which
+ * exists to link the hostels to campus) is not theirs to use; a hosteller,
+ * equally, does not enter through the day scholars' gate. Either crossing on
+ * its own is fine. A route containing BOTH describes a person who cannot exist.
+ *
+ * Matched loosely on name so renaming the pin in the field does not silently
+ * switch the rule off.
+ */
+const EXCLUSIVE_WAYS: { a: RegExp; b: RegExp; note: string }[] = [
+  {
+    a: /day.?scholar/i,
+    b: /subway (entrance|exit)/i,
+    note: "The day scholars' gate and the subway are not used by the same person.",
+  },
+];
+
+/**
+ * Segment sets that may not appear together on one route.
+ *
+ * The day scholars' gate exists only as a surveyor-placed point — no path in
+ * the graph carries "day scholar" in its label — so it is resolved through the
+ * placed gates, while the subway is matched on path label. Returns one pair of
+ * sets per rule, skipping any rule whose two halves are not both present.
+ */
+export function exclusiveSetsForTest() {
+  return exclusiveSets();
+}
+
+function exclusiveSets(): { a: Set<number>; b: Set<number> }[] {
+  const out: { a: Set<number>; b: Set<number> }[] = [];
+  for (const rule of EXCLUSIVE_WAYS) {
+    const a = new Set<number>();
+    /*
+     * Resolved from ALL placed points, not just armed gates.
+     *
+     * Who may use a crossing is a fact about the crossing, not about whether
+     * it currently happens to be shut. Reading this from placedGates() would
+     * mean that setting the day scholars' gate to "open to all" silently
+     * switched the rule off — the one edit most likely to be made, with no
+     * visible connection to the consequence.
+     */
+    for (const c of GSTORE.list) {
+      if (rule.a.test(c.name)) for (const i of segmentsNear(c)) a.add(i);
+    }
+    const b = new Set<number>();
+    for (const e of EDGES) if (rule.b.test(e.label)) b.add(e.idx);
+    if (a.size && b.size) out.push({ a, b });
+  }
+  return out;
+}
+
 /** Surveyor-marked impassable. Not a preference — a wall. */
 export function isBlocked(idx: number): boolean {
   return SURVEYS.get(idx)?.blocked === true;
@@ -1340,15 +1397,41 @@ export function routePair(
     return g === null || g.barrier === 'permission';
   };
 
-  const plan = (ok: (e: Edge) => boolean) => {
-    const shortestPathIdx = shortestPath(a, b, (e) => (ok(e) ? e.length : Infinity));
+  /** One search, with an optional set of segments taken off the table. */
+  const search = (ok: (e: Edge) => boolean, ban: Set<number> | null) => {
+    const usable = ban ? (e: Edge) => ok(e) && !ban.has(e.idx) : ok;
+    const shortestPathIdx = shortestPath(a, b, (e) => (usable(e) ? e.length : Infinity));
     if (shortestPathIdx.length === 0) return null;
     return {
       shortest: summarise(shortestPathIdx),
       safest: summarise(
-        shortestPath(a, b, (e) => (ok(e) ? e.length * (1 + alpha * e.risk) : Infinity)),
+        shortestPath(a, b, (e) => (usable(e) ? e.length * (1 + alpha * e.risk) : Infinity)),
       ),
     };
+  };
+
+  /*
+   * Mutually exclusive crossings, enforced by searching twice.
+   *
+   * A shortest-path search cannot express "not both of these" — the cost of an
+   * edge would have to depend on the rest of the path. Banning each half in
+   * turn and keeping the better survivor gives the same answer without that:
+   * neither result can contain both halves, because each had one removed
+   * outright, and every route that legitimately uses only one half is still
+   * found by whichever run left that half alone.
+   */
+  const plan = (ok: (e: Edge) => boolean) => {
+    const pairs = exclusiveSets();
+    if (pairs.length === 0) return search(ok, null);
+
+    let best: ReturnType<typeof search> = null;
+    for (const { a: setA, b: setB } of pairs) {
+      for (const ban of [setA, setB]) {
+        const got = search(ok, ban);
+        if (got && (!best || got.shortest.meters < best.shortest.meters)) best = got;
+      }
+    }
+    return best;
   };
 
   const notesOn = (segments: number[]): ClosureNote[] => {
@@ -2099,6 +2182,30 @@ export async function loadGates(): Promise<void> {
   GSTORE.version += 1;
 }
 
+/**
+ * The path segments a placed point physically sits on.
+ *
+ * By coordinate, never by segment index — a graph rebuild renumbers every
+ * segment, and a point is a thing standing at a place.
+ */
+function segmentsNear(c: Checkpoint): number[] {
+  const at: LatLng = { lat: c.lat, lng: c.lng };
+  const segments: number[] = [];
+  let nearest = -1;
+  let nd = Infinity;
+  for (const e of EDGES) {
+    const d = distToSegment(at, G.nodes[e.a], G.nodes[e.b]);
+    if (d < nd) {
+      nd = d;
+      nearest = e.idx;
+    }
+    if (d <= GATE_REACH_M) segments.push(e.idx);
+  }
+  // A point mapped slightly off the path still governs the path it guards.
+  if (!segments.length && nearest >= 0) segments.push(nearest);
+  return segments;
+}
+
 function buildGates(): { rules: GateRule[]; bySegment: Map<number, GateRule> } {
   const rules: GateRule[] = [];
   const bySegment = new Map<number, GateRule>();
@@ -2106,21 +2213,7 @@ function buildGates(): { rules: GateRule[]; bySegment: Map<number, GateRule> } {
   for (const c of GSTORE.list) {
     if (c.barrier !== 'hard' && c.barrier !== 'permission') continue;
 
-    const at: LatLng = { lat: c.lat, lng: c.lng };
-    const segments: number[] = [];
-    let nearest = -1;
-    let nd = Infinity;
-
-    for (const e of EDGES) {
-      const d = distToSegment(at, G.nodes[e.a], G.nodes[e.b]);
-      if (d < nd) {
-        nd = d;
-        nearest = e.idx;
-      }
-      if (d <= GATE_REACH_M) segments.push(e.idx);
-    }
-    // A gate mapped slightly off the path still controls the path it guards.
-    if (!segments.length && nearest >= 0) segments.push(nearest);
+    const segments = segmentsNear(c);
 
     const always = !c.closes || !c.opens;
     const rule: GateRule = {
