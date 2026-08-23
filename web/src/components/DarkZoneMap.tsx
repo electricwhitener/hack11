@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { Map as LMap, LayerGroup, Canvas } from 'leaflet';
+import type { Map as LMap, LayerGroup, Canvas, Control, ControlPosition } from 'leaflet';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Flag, MapPin, Sparkles } from 'lucide-react';
@@ -138,6 +138,10 @@ function segWeight(exposure: number, darkness: number): number {
   return base + Math.min(exposure, 1) * spread;
 }
 
+/** Where the zoom buttons can live without something else sitting on them. */
+const zoomCorner = (): ControlPosition =>
+  typeof window !== 'undefined' && window.innerWidth < 1024 ? 'topleft' : 'bottomright';
+
 /** Perpendicular distance in metres from a point to a segment. */
 function distToSeg(lat: number, lng: number, s: Segment): number {
   const mLat = 111320;
@@ -172,6 +176,7 @@ export function DarkZoneMap() {
   const focusRef = useRef<Set<number> | null>(null);
   const planRef = useRef<RoutePair | null>(null);
   const resizeObs = useRef<ResizeObserver | null>(null);
+  const zoomCtl = useRef<Control.Zoom | null>(null);
 
   const [places, setPlaces] = useState<Place[]>([]);
   const [from, setFrom] = useState('');
@@ -237,7 +242,18 @@ export function DarkZoneMap() {
         zoomControl: false,
         preferCanvas: true, // ~1.9k polylines: SVG would crawl, canvas does not
       }).setView([26.8425, 75.563], 16);
-      L.control.zoom({ position: 'bottomright' }).addTo(m);
+      /*
+       * Zoom moves out of the bottom-right on a phone.
+       *
+       * Below lg the "Ask" button sits at bottom-right and the panels take the
+       * full width of the bottom of the screen, so the zoom buttons ended up
+       * underneath both — visible, and untappable. On a phone the free corner
+       * is top-LEFT: the control panel is top-right and the header is above the
+       * map. Desktop keeps bottom-right, where nothing competes with it.
+       */
+      const zoom = L.control.zoom({ position: zoomCorner() });
+      zoom.addTo(m);
+      zoomCtl.current = zoom;
 
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap &copy; CARTO',
@@ -328,7 +344,14 @@ export function DarkZoneMap() {
        * an otherwise dark map. A ResizeObserver covers every cause: the dock,
        * the mobile sheet, and the window itself.
        */
-      const ro = new ResizeObserver(() => m.invalidateSize({ animate: false }));
+      const ro = new ResizeObserver(() => {
+        m.invalidateSize({ animate: false });
+        // Rotating a phone, or opening the dock, can cross the breakpoint.
+        const want = zoomCorner();
+        if (zoomCtl.current && zoomCtl.current.getPosition() !== want) {
+          zoomCtl.current.setPosition(want);
+        }
+      });
       if (holder.current) ro.observe(holder.current);
       resizeObs.current = ro;
 
@@ -994,11 +1017,11 @@ export function DarkZoneMap() {
 
       {/* Desktop: a column down the left. Phone: a sheet along the bottom that
           never covers more than half the map, because the map is the point. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1000] flex max-h-[48dvh] flex-col gap-3 overflow-y-auto p-3 pr-[4.75rem] sm:inset-y-0 sm:right-auto sm:max-h-none sm:w-full sm:max-w-sm sm:p-4 sm:pr-4">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1000] flex max-h-[52dvh] flex-col gap-3 overflow-y-auto p-3 pb-20 sm:inset-y-0 sm:right-auto sm:max-h-none sm:w-full sm:max-w-sm sm:p-4 sm:pb-20 lg:pb-4">
         <div className="pointer-events-auto rounded-xl border bg-card/95 p-3 shadow-lg backdrop-blur">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-1.5 min-[420px]:flex-row min-[420px]:items-center min-[420px]:gap-2">
             <PlaceSelect places={places} points={checkpoints} value={from} onChange={setFrom} />
-            <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
+            <ArrowRight className="size-3.5 shrink-0 rotate-90 text-muted-foreground min-[420px]:rotate-0" />
             <PlaceSelect places={places} points={checkpoints} value={to} onChange={setTo} />
           </div>
           <div className="mt-2 space-y-2">
@@ -1111,7 +1134,7 @@ export function DarkZoneMap() {
        * gives the map one place where controls live; the instruction moved to a
        * hint line underneath, which is where an instruction belongs anyway.
        */}
-      <div className="absolute right-3 top-3 z-[1000] flex w-[186px] flex-col items-stretch gap-2 sm:right-4 sm:top-4">
+      <div className="absolute right-3 top-3 z-[1000] flex w-[min(186px,45vw)] flex-col items-stretch gap-2 sm:right-4 sm:top-4 sm:w-[186px]">
         <div className="rounded-xl border bg-card/95 p-1.5 shadow-lg backdrop-blur">
           <MapControl
             icon={<Sparkles className="size-3.5" />}
@@ -1255,7 +1278,7 @@ function PlaceSelect({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="mt-1 h-9 w-full rounded-md border bg-background px-2 text-sm text-foreground"
+      className="h-9 w-full min-w-0 rounded-md border bg-background px-2 text-sm text-foreground"
     >
       <optgroup label="Hostel blocks">
         {hostels.map((p) => (
