@@ -13,6 +13,19 @@ import { loadAll } from '@/lib/nightsafety';
 
 export const maxDuration = 60;
 
+/**
+ * How long the fallback chain may spend LOOKING for a model that will answer.
+ *
+ * Twelve attempts that each take a few seconds to be refused add up to the
+ * whole 60 s budget, and the function is then killed by the platform — the user
+ * waits a full minute and gets a 504, which is the worst outcome available.
+ * Measured: two 504s in four calls at realistic pacing.
+ *
+ * Stopping at 28 s leaves room for the answer itself and turns the bad case
+ * into a calm message after a pause, instead of a minute of nothing.
+ */
+const SEARCH_BUDGET_MS = 28_000;
+
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
@@ -39,7 +52,15 @@ export async function POST(req: Request) {
       // Walk every (key, model) pair. Google's free quota is per project per
       // model per day, so an exhausted combination is normal, not exceptional
       // — move to the next one.
+      const startedAt = Date.now();
+
       for (const attempt of MODEL_ATTEMPTS) {
+        /*
+         * Give up SEARCHING before the platform gives up on us. Once a model
+         * has accepted the request this no longer applies — the answer streams
+         * on whatever time is left.
+         */
+        if (Date.now() - startedAt > SEARCH_BUDGET_MS) break;
         // streamText's own onError receives the REAL provider error. The promise
         // below rejects with a bare "No output generated" and no `cause`, so this
         // callback is the only place the 429 is actually visible.
@@ -57,7 +78,14 @@ export async function POST(req: Request) {
             providerOptions: googleOptions,
             // Each step is a separate API request, so this directly multiplies
             // quota use. Keep it low.
-            stopWhen: stepCountIs(5),
+            /*
+             * Four, not five. Every step is a separate API request, so each one
+             * is another chance to be rate-limited mid-answer, on a pair we can
+             * no longer switch away from. Observed traces use three — two tools
+             * and the reply — so this keeps one spare and drops a round trip
+             * from the worst case.
+             */
+            stopWhen: stepCountIs(4),
             // The chain is our real retry strategy; retrying an exhausted model
             // just wastes seconds before failing anyway.
             maxRetries: 0,
@@ -152,6 +180,15 @@ function exhaustedError(error: unknown): string {
   logFailure('chain-exhausted', error);
   const raw = errorText(error);
 
+  /*
+   * A per-MINUTE limit is not a per-day one, and saying "back tomorrow" when
+   * the answer is "back in ten seconds" is both false and alarming — precisely
+   * the sentence you do not want on screen during a demo. Google names the
+   * window in the quota metric, so the two are distinguishable.
+   */
+  if (/PerMinute|per minute|RPM/i.test(raw)) {
+    return 'The assistant is busy for a moment. Ask again in a few seconds.';
+  }
   if (isQuota(raw)) return 'Daily usage limit reached. The assistant will be back tomorrow.';
   if (/API key|PERMISSION_DENIED|401|403/i.test(raw)) return 'The assistant is unavailable right now.';
   if (/not found|404|deprecated/i.test(raw)) return 'The assistant is unavailable right now.';
