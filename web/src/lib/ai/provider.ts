@@ -73,7 +73,7 @@ export const FAST_MODEL_ID = process.env.FAST_MODEL_ID ?? 'gemini-flash-lite-lat
  *   gemini-flash-lite-latest    3.5 s
  *   gemini-3.1-flash-lite       4.1 s
  *   gemini-3.5-flash            5.8 s   (quota spent on key1 when measured)
- *   gemini-3.6-flash           43.6 s   <- last resort ONLY
+ *   gemini-3.6-flash           43.6 s   <- REMOVED, see below
  *
  * All of them call the right tools on every run, so the ordering costs nothing
  * in correctness. The lite models write a little more tersely — roughly 190
@@ -85,30 +85,43 @@ export const FAST_MODEL_ID = process.env.FAST_MODEL_ID ?? 'gemini-flash-lite-lat
  * falling through. A dead model at the head of the chain is latency nobody
  * agreed to pay.
  *
- * `gemini-3.6-flash` stays last. Being newer bought nothing measurable —
- * identical tool calls, an equivalent answer — and cost 7.5x the latency. At
- * 43.6 s it is close enough to the route's 60 s maxDuration that a slow run
- * would time out rather than merely embarrass. It remains in the chain only
- * because it is 20 more requests a day.
+ * `gemini-3.6-flash` is GONE, not merely demoted. At 43.6 s a single attempt
+ * plus the failures ahead of it exceeds the route's 60 s maxDuration, so it
+ * does not degrade the answer — it returns a 504 having first consumed the
+ * entire budget. An attempt that cannot finish is worse than no attempt, and
+ * the 20 requests a day it contributed are not worth a timeout on stage.
  */
 export const MODEL_CHAIN = (
   process.env.MODEL_CHAIN ??
-  'gemini-3.5-flash-lite,gemini-flash-lite-latest,gemini-3.1-flash-lite,gemini-3.5-flash,gemini-3.6-flash'
+  'gemini-3.5-flash-lite,gemini-flash-lite-latest,gemini-3.1-flash-lite,gemini-3.5-flash'
 )
   .split(',')
   .map((m) => m.trim())
   .filter(Boolean);
 
 /**
- * Every (key, model) pair to try, in order. Outer loop is keys, inner is
- * models: exhaust everything on key 1 before touching key 2. This keeps usage
- * concentrated on one key at a time, which makes the AI Studio dashboard
- * (which is per-key) easier to read mid-hackathon.
+ * Every (key, model) pair to try, in order. MODEL outer, KEY inner — the
+ * fastest model is tried on all three keys before any slower model is tried at
+ * all.
+ *
+ * This was the other way round, concentrating usage on one key so the per-key
+ * AI Studio dashboard was easier to read. That convenience cost a demo.
+ *
+ * Google limits requests per MINUTE as well as per day, and the per-minute
+ * bucket is per project — so three messages in quick succession can rate-limit
+ * key1 while keys 2 and 3 sit idle. Walking key1's five models first meant a
+ * rate-limited key1 pushed the request down to key1's SLOWEST model, on the
+ * very key that was already refusing it, and the request spent its whole 60 s
+ * budget doing so. Measured: two 504s in three consecutive calls.
+ *
+ * Failing sideways to another key on the same fast model is both likelier to
+ * succeed and bounded in latency. A different key is a different project, and
+ * therefore a different per-minute bucket.
  */
 export type ModelAttempt = { label: string; keyIndex: number; modelId: string };
 
-export const MODEL_ATTEMPTS: ModelAttempt[] = providers.flatMap((_, keyIndex) =>
-  MODEL_CHAIN.map((modelId) => ({
+export const MODEL_ATTEMPTS: ModelAttempt[] = MODEL_CHAIN.flatMap((modelId) =>
+  providers.map((_, keyIndex) => ({
     label: `key${keyIndex + 1}/${modelId}`,
     keyIndex,
     modelId,
