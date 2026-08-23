@@ -142,26 +142,60 @@ const explainRanking = tool({
   }),
   execute: async ({ street }) => {
     const q = street.trim().toLowerCase();
-    const matched = edges.filter((e) => e.label.toLowerCase().includes(q));
+
+    /*
+     * Exact label first, substring only as a fallback.
+     *
+     * A bare `includes` silently aggregates every path whose name contains the
+     * query — asking about "Faculty Block Entrance" pulled in two different
+     * paths and 6.4 km — and the model then states the combined figure as if it
+     * described one street. When the fallback does fire, matchedLabels says so.
+     */
+    const exact = edges.filter((e) => e.label.toLowerCase() === q);
+    const matched = exact.length ? exact : edges.filter((e) => e.label.toLowerCase().includes(q));
     if (matched.length === 0) {
       return { error: `No path matching "${street}" in the mapped area.` };
     }
 
-    const unlit = matched.filter((e) => e.lit === 0);
+    /*
+     * Unlit by the BELIEF model, the same `darkness > 0.5` the repair queue and
+     * the map use. This counted `e.lit === 0` — the raw flag baked into the
+     * graph — which ignores every survey and citizen report since. On the top
+     * repair candidate that was 581 m against the map's 147 m, so the agent
+     * contradicted the screen it was sitting next to.
+     */
+    const unlitMeters = matched
+      .filter((e) => e.darkness > 0.5)
+      .reduce((s, e) => s + e.length, 0);
     const meters = matched.reduce((s, e) => s + e.length, 0);
     const avgExposure = matched.reduce((s, e) => s + e.exposure * e.length, 0) / meters;
-    const areaAvg = edges.reduce((s, e) => s + e.exposure * e.length, 0) /
+    const areaAvg =
+      edges.reduce((s, e) => s + e.exposure * e.length, 0) /
       edges.reduce((s, e) => s + e.length, 0);
 
+    const labels = [...new Set(matched.map((e) => e.label))];
+    const pathLengthMeters = Math.round(meters);
+    const unlit = Math.round(unlitMeters);
+
     return {
-      street,
+      street: labels.length === 1 ? labels[0] : street,
+      matchedLabels: labels,
       segments: matched.length,
-      totalMeters: Math.round(meters),
-      unlitMeters: Math.round(unlit.reduce((s, e) => s + e.length, 0)),
+      pathLengthMeters,
+      unlitMeters: unlit,
       avgExposure: Number(avgExposure.toFixed(3)),
       areaAverageExposure: Number(areaAvg.toFixed(3)),
       timesBusierThanAverage: Number((avgExposure / areaAvg).toFixed(1)),
       riskMeters: Math.round(matched.reduce((s, e) => s + e.risk * e.length, 0)),
+      /*
+       * A ready-made correct sentence. The model kept reading pathLengthMeters
+       * as the unlit figure and saying "spans 5741 metres of unlit path";giving
+       * it one unambiguous phrasing to echo is more reliable than hoping it
+       * keeps two similarly-named numbers apart.
+       */
+      summary:
+        `${labels.length === 1 ? labels[0] : `${labels.length} paths matching "${street}"`} ` +
+        `is ${pathLengthMeters} m long in total, of which ${unlit} m are unlit.`,
     };
   },
 });
