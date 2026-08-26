@@ -248,3 +248,6 @@ docs/STATE.md            living project state
 ```
 
 `web/src/lib/nightsafety.ts` is where the product lives. Read it before changing behaviour.
+---
+Made with lovee
+Andaa & Tindaa
